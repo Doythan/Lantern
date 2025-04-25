@@ -1,0 +1,7 @@
+1. AppCompatActivity Class
+: 앱 화면을 만들 때 lifecycle 같은걸 관리한다.   
+- setContentView() : XML 레이아웃을 화면에 붙이기
+- onCreate() : 화면 생성 시 초기 설정
+- onPause() / onResume() : 앱이 백그라운드/포그라운드로 전환될 때 처리
+- FragmentManager : 프래그먼트(부분화면) 제어
+- 테마/툴바 호환성 유지 : 안드로이드 버전에 관계없이 UI 일관성 유지
