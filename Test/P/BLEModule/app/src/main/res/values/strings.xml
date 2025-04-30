@@ -1,3 +1,23 @@
 <resources>
-    <string name="app_name">BLEModule</string>
+    <string name="app_name">진짜 최종</string>
+
+    <string name="service_notification_channel_name">BLE 서비스 상태</string>
+    <string name="service_notification_channel_description">BLE 백그라운드 서비스 상태 알림</string>
+    <string name="ble_service_notification_title">BLE 서비스 실행 중</string>
+    <string name="ble_service_notification_text">주변 기기와 통신 중입니다.</string>
+
+    <string name="start_service">서비스 시작</string>
+    <string name="stop_service">서비스 중지</string>
+    <string name="send_ping">Ping 보내기</string>
+    <string name="hint_my_device_id">내 기기 ID (A, B, C)</string>
+    <string name="hint_target_id">대상 ID (예: C)</string>
+    <string name="log_label">로그:</string>
+    <string name="error_invalid_device_id">유효한 기기 ID(A, B, C)를 입력하세요.</string>
+    <string name="error_permission_required">앱 실행을 위해 권한이 필요합니다.</string>
+    <string name="error_bluetooth_disabled">BLE 기능을 사용하려면 블루투스를 켜야 합니다.</string>
+    <string name="error_service_not_running">서비스가 실행 중이 아닙니다.</string>
+    <string name="error_target_id_required">대상 ID를 입력하세요.</string>
+    <string name="error_unknown_target">알 수 없는 대상 ID입니다.</string>
+    <string name="info_permissions_granted">모든 권한이 허용되었습니다.</string>
+    <string name="info_bluetooth_enabled">블루투스가 활성화되었습니다.</string>
 </resources>
