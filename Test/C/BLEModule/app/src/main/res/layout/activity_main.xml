@@ -5,15 +5,32 @@
     android:id="@+id/main"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity">
+    tools:context=".ui.view.MainActivity">
 
-    <TextView
-        android:layout_width="wrap_content"
+    <!-- Device ID 입력 -->
+    <EditText
+        android:id="@+id/etDeviceId"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:hint="내 디바이스 ID (A, B, C)"
+        android:inputType="text"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.5"
+        android:layout_margin="16dp" />
+
+    <!-- 채팅 시작 버튼 -->
+    <Button
+        android:id="@+id/btnGoChat"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="채팅 시작"
+        app:layout_constraintTop_toBottomOf="@id/etDeviceId"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
