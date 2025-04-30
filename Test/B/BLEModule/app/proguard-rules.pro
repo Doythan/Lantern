@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+
+# Hilt 사용 시 기본 rule
+-keep class dagger.** { *; }
+-dontwarn dagger.hilt.**
