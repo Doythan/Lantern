@@ -1,6 +1,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    id("com.google.devtools.ksp")
+    id("androidx.room")
+
 }
 
 android {
@@ -33,6 +36,18 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    room {
+        // schemas 폴더를 미리 생성해 두세요: app/schemas/
+        schemaDirectory("$projectDir/schemas")
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
+
+
 }
 
 dependencies {
@@ -45,5 +60,18 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    val roomVersion = "2.7.1"
+    implementation("androidx.room:room-runtime:$roomVersion")      // core
+    ksp         ("androidx.room:room-compiler:$roomVersion")     // annotation processor
+    implementation("androidx.room:room-ktx:$roomVersion")         // Kotlin Coroutines 확장
+    // 필요시
+    // implementation("androidx.room:room-rxjava2:$roomVersion")
+    // implementation("androidx.room:room-guava:$roomVersion")
+
+    // 테스트/페이징 등 옵션
+    testImplementation("androidx.room:room-testing:$roomVersion")
+    implementation("androidx.room:room-paging:$roomVersion")
+
 
 }
