@@ -12,5 +12,8 @@ data class ChatRoom(
     val chatRoomId: Long,
 
     @ColumnInfo(name = "updated_at")
-    val updatedAt: LocalDateTime
+    val updatedAt: LocalDateTime,
+
+    @ColumnInfo(name = "participant_id")
+    val participantId: Long
 )

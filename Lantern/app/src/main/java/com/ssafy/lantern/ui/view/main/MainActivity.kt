@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.ssafy.lantern.MyApp
 import com.ssafy.lantern.R
 import com.ssafy.lantern.data.source.ble.advertiser.AdvertiserManager
 import com.ssafy.lantern.data.source.ble.gatt.GattServerManager
@@ -31,6 +32,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+
+        val db = (application as MyApp).db
+        db.openHelper.readableDatabase
+
 
         // PermissionHelper 객체 생성
         permissionHelper = PermissionHelper(this)

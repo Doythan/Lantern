@@ -1,6 +1,9 @@
 package com.ssafy.lantern.data.database
 
+import androidx.room.AutoMigration
 import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import com.ssafy.lantern.data.model.CallList
 import com.ssafy.lantern.data.model.ChatRoom
 import com.ssafy.lantern.data.model.Follow
@@ -14,16 +17,18 @@ import com.ssafy.lantern.data.repository.UserDao
 
 @Database(
     entities = [
-        User::class,          // user 테이블
-        CallList::class,      // call_list 테이블
-        Messages::class,        // message 테이블
+        User::class,
+        CallList::class,
+        Messages::class,
         Follow::class,
         ChatRoom::class
     ],
-    version = 1,              // 새 엔티티 추가 → 버전 +1
-    exportSchema = false
+    version = 1,                     // 버전 2로 업데이트
+    exportSchema = true,             // 스키마 JSON 내보내기
+
 )
-abstract class AppDatabase {
+@TypeConverters(Converters::class)
+abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun callListDao(): CallListDao
     abstract fun chatRoomDao(): ChatRoomDao

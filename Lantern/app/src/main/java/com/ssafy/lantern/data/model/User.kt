@@ -9,7 +9,7 @@ import androidx.room.PrimaryKey
 data class User(
     @PrimaryKey
     @ColumnInfo(name = "user_id")
-    val userId: Int,
+    val userId: Long,
 
     val nickname: String,
 
