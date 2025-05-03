@@ -1,36 +1,25 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    id("com.google.devtools.ksp") version "1.8.0-1.0.9"
+    id("com.google.devtools.ksp") version "1.8.21-1.0.11"
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
 }
 
 android {
     namespace = "com.ssafy.lantern"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.ssafy.lantern"
-<<<<<<< HEAD
-        minSdk = 33
-        targetSdk = 34
-=======
         minSdk = 31
         targetSdk = 35
->>>>>>> develop
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        // Room 스키마 위치 설정
-        javaCompileOptions {
-            annotationProcessorOptions {
-                arguments += mapOf(
-                    "room.schemaLocation" to "$projectDir/schemas",
-                    "room.incremental" to "true"
-                )
-            }
-        }
     }
 
     buildTypes {
@@ -42,6 +31,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -55,12 +45,11 @@ android {
         viewBinding = true
         compose = true
     }
-
     composeOptions {
         kotlinCompilerExtensionVersion = "1.4.0"
     }
-    
-    // KSP 관련 설정
+
+    // KSP-generated sources
     applicationVariants.all {
         val variantName = name
         kotlin.sourceSets.getByName(variantName) {
@@ -69,10 +58,7 @@ android {
     }
 }
 
-
-
 dependencies {
-
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -82,8 +68,8 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // Room 라이브러리
-    val roomVersion = "2.5.2"  // 버전 변경
+    // Room
+    val roomVersion = "2.6.0"
     implementation("androidx.room:room-runtime:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
