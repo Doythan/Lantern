@@ -1,4 +1,4 @@
-2025.04.21
+.2025.04.21
 바텐딩 앱 제안
 가상 바텐더 캐릭터랑 같이 만드는 구성있으면 좋을듯.
 
@@ -156,7 +156,7 @@ BLE 신호를 탐색하기 위한 코드 구현
 Signal Protocol의 핵심은 두 가지 ‘래칫(ratchet)’을 번갈아 가며 돌리는 구조
 
 | Ratchet 종류 | 역할 |
-| --- | --- |
+| --- | --- |.
 | **Diffie–Hellman Ratchet** | 주기적으로 새로운 DH 키 쌍을 생성 → 루트 키(root key) 갱신 |
 | **Symmetric-Key Ratchet** | 각 메시지마다 대칭키(chain key)로부터 메시지 키(message key) 파생 |
 
