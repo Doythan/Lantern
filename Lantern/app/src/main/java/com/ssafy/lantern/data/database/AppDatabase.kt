@@ -1,5 +1,6 @@
 package com.ssafy.lantern.data.database
 
+
 import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
@@ -23,7 +24,10 @@ import com.ssafy.lantern.data.repository.UserDao
         Follow::class,
         ChatRoom::class
     ],
-    version = 1,                     // 버전 2로 업데이트
+    version = 2,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2)
+    ],// 버전 2로 업데이트
     exportSchema = true,             // 스키마 JSON 내보내기
 
 )

@@ -12,7 +12,7 @@ class MyApp : Application() {
             AppDatabase::class.java,
             "lantern.db"
         )
-            .fallbackToDestructiveMigration(false)
+            .fallbackToDestructiveMigration(true)
             .build()
     }
 

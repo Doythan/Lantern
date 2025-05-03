@@ -1,6 +1,5 @@
 package com.ssafy.lantern.data.model
 
-import android.provider.ContactsContract
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -12,10 +11,6 @@ data class User(
     val userId: Long,
 
     val nickname: String,
-
-    val email: String,
-
-    val password: String,
 
     @ColumnInfo(name = "device_id")
     val deviceId: String
