@@ -14,8 +14,8 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.ssafy.lantern"
-        minSdk = 31
-        targetSdk = 35
+        minSdk = 33
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
