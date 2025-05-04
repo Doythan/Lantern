@@ -12,7 +12,6 @@ ksp {
 android {
     namespace = "com.ssafy.lantern"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "com.ssafy.lantern"
         minSdk = 31
@@ -20,6 +19,16 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Room 스키마 위치 설정
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += mapOf(
+                    "room.schemaLocation" to "$projectDir/schemas",
+                    "room.incremental" to "true"
+                )
+            }
+        }
     }
 
     buildTypes {
