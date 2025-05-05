@@ -9,8 +9,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -31,7 +29,8 @@ import com.ssafy.lantern.ui.theme.LanternTheme
 fun FriendListScreen(
     onBackClick: () -> Unit,
     onCallItemClick: () -> Unit = {},
-    onProfileClick: () -> Unit = {}
+    onProfileClick: () -> Unit = {},
+    paddingValues: PaddingValues = PaddingValues()
 ) {
     // Dummy data for the friend list
     val dummyFriends = remember {
@@ -58,6 +57,7 @@ fun FriendListScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .padding(paddingValues)
     ) {
         // Top Bar
         Box(
@@ -127,69 +127,6 @@ fun FriendListScreen(
                     FriendCallItem(friend)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
-            }
-        }
-        
-        // Bottom Navigation
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(64.dp)
-                .background(Color.Black),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Phone Icon (Selected)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFFFFD700), CircleShape)
-                        .padding(8.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = android.R.drawable.ic_menu_call),
-                        contentDescription = "Calls",
-                        tint = Color.Black,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // 선택 표시
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(4.dp)
-                        .background(Color(0xFFFFD700), CircleShape)
-                )
-            }
-            
-            // Home Icon
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = "Home",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-            
-            // Profile Icon
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onProfileClick() }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "Profile",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
             }
         }
     }

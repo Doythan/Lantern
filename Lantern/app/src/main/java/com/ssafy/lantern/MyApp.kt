@@ -4,7 +4,9 @@ package com.ssafy.lantern
 import android.app.Application
 import androidx.room.Room
 import com.ssafy.lantern.data.database.AppDatabase
+import dagger.hilt.android.HiltAndroidApp
 
+@HiltAndroidApp
 class MyApp : Application() {
     val db: AppDatabase by lazy {
         Room.databaseBuilder(

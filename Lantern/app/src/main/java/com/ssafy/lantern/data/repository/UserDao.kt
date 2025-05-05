@@ -26,5 +26,7 @@ interface UserDao {
     @Query("UPDATE `user` SET nickname = :nickname WHERE user_id = :userId")
     suspend fun updateNickname(userId: Long, nickname: String): Int
 
-
+    // 모든 사용자 정보 삭제
+    @Query("DELETE FROM `user`")
+    suspend fun deleteAllUsers()
 }
