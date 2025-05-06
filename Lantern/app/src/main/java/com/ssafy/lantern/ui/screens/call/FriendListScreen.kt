@@ -126,7 +126,11 @@ fun FriendListScreen(
                 ) {
                     FriendCallItem(friend)
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                Divider(
+                    color = Color(0xFF333333),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
             }
         }
     }

@@ -16,6 +16,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.ssafy.lantern.ui.navigation.AppDestinations
 
 // 하단 네비게이션 아이템 정의
 sealed class BottomNavItem(

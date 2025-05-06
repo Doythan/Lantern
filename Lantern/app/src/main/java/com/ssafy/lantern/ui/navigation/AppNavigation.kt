@@ -1,36 +1,31 @@
 package com.ssafy.lantern.ui.navigation
 
+import androidx.compose.foundation.layout.PaddingValues // PaddingValues 임포트 확인
 import androidx.compose.runtime.Composable
-// import androidx.compose.runtime.mutableStateOf // 사용 안 함
-// import androidx.compose.runtime.remember // 사용 안 함
-// import androidx.compose.runtime.getValue // 사용 안 함
-// import androidx.compose.runtime.setValue // 사용 안 함
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.ssafy.lantern.ui.common.MainScaffold // MainScaffold 임포트
 import com.ssafy.lantern.ui.screens.call.CallHistoryScreen // 필요 시 사용
 import com.ssafy.lantern.ui.screens.call.FriendListScreen
 import com.ssafy.lantern.ui.screens.call.IncomingCallScreen
 import com.ssafy.lantern.ui.screens.call.OngoingCallScreen
 import com.ssafy.lantern.ui.screens.chat.ChatScreen // ChatScreen 임포트
+import com.ssafy.lantern.ui.screens.chat.ChatListScreen // ChatListScreen 임포트
 import com.ssafy.lantern.ui.screens.login.LoginScreen
-// import com.ssafy.lantern.ui.screens.main.PlaceholderMainScreen // 임시 메인 화면 제거
 import com.ssafy.lantern.ui.screens.mypage.MyPageScreen
 import com.ssafy.lantern.ui.screens.signup.SignupScreen
-import com.ssafy.lantern.ui.screens.main.PlaceholderMainScreen
-import com.ssafy.lantern.ui.common.MainScaffold // MainScaffold 임포트 추가
 
 // 네비게이션 라우트 정의
 object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val SIGNUP_ROUTE = "signup"
-    // const val PLACEHOLDER_MAIN_ROUTE = "placeholder_main" // 제거
-    const val CHAT_ROUTE = "chat" // 채팅 화면 라우트 추가
+    const val CHAT_ROUTE = "chat" // 채팅 상세 화면 라우트
     const val MYPAGE_ROUTE = "mypage"
-    const val FRIENDLIST_ROUTE = "friendlist"
+    const val FRIENDLIST_ROUTE = "friendlist" // 통화 목록 (하단 탭)
     const val INCOMING_CALL_ROUTE = "incomingcall"
     const val ONGOING_CALL_ROUTE = "ongoingcall"
-    const val HOME_ROUTE = "home"
+    const val HOME_ROUTE = "home" // 채팅 목록 (하단 탭) - 기존 메인 역할
     // 다른 라우트 추가 가능
 }
 
@@ -47,15 +42,15 @@ fun AppNavigation() {
         // 로그인 화면
         composable(AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
-                // 각 버튼 클릭 시 해당하는 라우트로 이동
                 onSignUpClick = { navController.navigate(AppDestinations.SIGNUP_ROUTE) },
-                onMyPageClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) }, // 로그인 상태 확인 필요할 수 있음
-                onFriendListClick = { navController.navigate(AppDestinations.FRIENDLIST_ROUTE) }, // 로그인 상태 확인 필요할 수 있음
-                onIncomingCallClick = { navController.navigate(AppDestinations.INCOMING_CALL_ROUTE) },
-                onHomeClick = { navController.navigate(AppDestinations.HOME_ROUTE) },
-                // 로그인 성공 시 홈 화면으로 이동
+                // 아래 클릭 핸들러들은 로그인 성공 시 이동으로 대체될 수 있음
+                onMyPageClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) },
+                onFriendListClick = { navController.navigate(AppDestinations.FRIENDLIST_ROUTE) },
+                onIncomingCallClick = { navController.navigate(AppDestinations.INCOMING_CALL_ROUTE) }, // 테스트용?
+                onHomeClick = { navController.navigate(AppDestinations.HOME_ROUTE) }, // 주석 해제
                 onLoginSuccess = {
-                    navController.navigate(AppDestinations.HOME_ROUTE) { // HOME_ROUTE로 변경
+                    // 로그인 성공 시 HOME_ROUTE (채팅 목록)으로 이동하고 로그인 화면은 백스택에서 제거
+                    navController.navigate(AppDestinations.HOME_ROUTE) {
                         popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
                     }
                 }
@@ -65,41 +60,50 @@ fun AppNavigation() {
         // 회원가입 화면
         composable(AppDestinations.SIGNUP_ROUTE) {
             SignupScreen(
-                // 뒤로 가기 (로그인 화면으로)
                 onBackToLoginClick = { navController.popBackStack() }
             )
         }
 
-        // 채팅 화면 추가
+        // 채팅 상세 화면 (개별 채팅방) - 하단 네비게이션 없음
         composable(AppDestinations.CHAT_ROUTE) {
+            // ChatScreen은 MainScaffold 밖에 있어야 하단 네비게이션이 보이지 않음
             ChatScreen(
-                // 필요 시 navController 등 전달
+                // 필요 시 navController, chatId 등 전달
             )
         }
 
-        // 홈 화면 (네비게이션 바 포함)
+        // --- 하단 네비게이션 바가 있는 화면들 ---
+
+        // 홈(채팅 목록) 화면 (네비게이션 바 포함)
         composable(AppDestinations.HOME_ROUTE) {
-            MainScaffold(navController = navController) { paddingValues -> // MainScaffold로 감싸기
-                PlaceholderMainScreen(
-                    // PlaceholderMainScreen은 이제 paddingValues를 사용할 수 있음 (필요하다면)
-                    // Modifier.padding(paddingValues) 등을 적용 가능
+            MainScaffold(navController = navController) { paddingValues ->
+                ChatListScreen(paddingValues = paddingValues) // MainScaffold 내부 컨텐츠
+            }
+        }
+
+        // 통화 목록 화면 (네비게이션 바 포함)
+        composable(AppDestinations.FRIENDLIST_ROUTE) {
+            MainScaffold(navController = navController) { paddingValues ->
+                FriendListScreen(
+                    onBackClick = { navController.popBackStack() }, // 현재 구조상 필요 없을 수 있음
+                    onCallItemClick = { navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) }, // 통화 아이템 클릭 시 통화 중 화면으로 이동 (예시)
+                    onProfileClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) }, // 프로필 클릭 시 마이페이지로 이동 (예시)
+                    paddingValues = paddingValues // Scaffold 패딩 전달
                 )
             }
         }
 
         // 마이페이지 화면 (네비게이션 바 포함)
         composable(AppDestinations.MYPAGE_ROUTE) {
-            MainScaffold(navController = navController) { paddingValues -> // MainScaffold에서 paddingValues 받음
+            MainScaffold(navController = navController) { paddingValues ->
                 MyPageScreen(
-                    // ViewModel은 Hilt가 주입
-                    popBackStack = { navController.popBackStack() }, // onBackClick 대신 popBackStack 전달
-                    onNavigateToLogin = { // onNavigateToLogin 콜백 전달
-                        // 로그아웃 시 로그인 화면으로 이동하고 백스택 모두 제거
+                    popBackStack = { navController.popBackStack() }, // 뒤로가기
+                    onNavigateToLogin = { // 로그아웃 처리
                         navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                            popUpTo(navController.graph.id) { // 전체 그래프까지 popUp
+                            popUpTo(navController.graph.id) { // 전체 백스택 클리어
                                 inclusive = true
                             }
-                            launchSingleTop = true // 로그인 화면 중복 방지
+                            launchSingleTop = true // 로그인 화면 중복 생성 방지
                         }
                     },
                     paddingValues = paddingValues // Scaffold 패딩 전달
@@ -107,33 +111,33 @@ fun AppNavigation() {
             }
         }
 
-        // 친구 목록 (최근 통화) 화면 (네비게이션 바 포함)
-        composable(AppDestinations.FRIENDLIST_ROUTE) {
-            MainScaffold(navController = navController) { paddingValues ->
-                FriendListScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onCallItemClick = { navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) },
-                    onProfileClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) }
-                     // Modifier.padding(paddingValues) 적용 가능
-                )
-            }
-        }
+        // --- 하단 네비게이션 바가 없는 화면들 (계속) ---
 
         // 전화 수신 화면
         composable(AppDestinations.INCOMING_CALL_ROUTE) {
              IncomingCallScreen(
-                 callerName = "도경원", // 실제 데이터 전달 필요
-                 onRejectClick = { navController.popBackStack() }, // 또는 다른 로직
-                 onAcceptClick = { navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) { popUpTo(AppDestinations.INCOMING_CALL_ROUTE) {inclusive = true}} } // 수신 화면 제거
+                 callerName = "임시 발신자", // 실제 데이터 전달 필요
+                 onRejectClick = { navController.popBackStack() }, // 거절 시 이전 화면으로
+                 onAcceptClick = { // 수락 시 통화 중 화면으로 이동하고 수신 화면은 제거
+                     navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) {
+                         popUpTo(AppDestinations.INCOMING_CALL_ROUTE) { inclusive = true }
+                     }
+                 }
              )
         }
 
         // 통화 중 화면
         composable(AppDestinations.ONGOING_CALL_ROUTE) {
             OngoingCallScreen(
-                 callerName = "도경원", // 실제 데이터 전달 필요
-                 // 통화 종료 후 채팅 화면으로 가도록 수정 (예시)
-                 onEndCallClick = { navController.navigate(AppDestinations.CHAT_ROUTE) { popUpTo(AppDestinations.LOGIN_ROUTE)} } // 백스택 관리 고려
+                 callerName = "임시 발신자", // 실제 데이터 전달 필요
+                 onEndCallClick = {
+                     // 통화 종료 후 HOME (채팅 목록)으로 이동 (백스택 관리 필요 시 조정)
+                     // 예: 통화 시작 전 화면으로 돌아가려면 popBackStack() 사용
+                     navController.navigate(AppDestinations.HOME_ROUTE){
+                         // 필요에 따라 popUpTo 등을 사용하여 백스택 정리
+                         popUpTo(AppDestinations.LOGIN_ROUTE) // 로그인 이후의 모든 화면 제거 (예시)
+                     }
+                 }
              )
         }
 

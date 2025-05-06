@@ -34,7 +34,7 @@ data class ChatItem(
 )
 
 @Composable
-fun ChatListScreen() {
+fun ChatListScreen(paddingValues: PaddingValues = PaddingValues()) {
     val chatList = remember {
         listOf(
             ChatItem(1, "내가진짜도경원", "와, 와이파이 없이 대화 신기하당 ㅎㅎ", "11:20 am", true),
@@ -50,7 +50,7 @@ fun ChatListScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF181818))
-            .padding(bottom = 56.dp) // 하단 네비게이션 고려
+            .padding(paddingValues)
     ) {
         // 상단 스토리/친구 아바타 영역 (간단히)
         Row(
