@@ -52,11 +52,15 @@ class LoginViewModel @Inject constructor(
     // GoogleSignInClient 인스턴스 (지연 초기화)
     private val googleSignInClient: GoogleSignInClient by lazy {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            // 서버로부터 ID 토큰 요청 (수정된 serverClientId 사용)
+            // 서버로부터 ID 토큰 요청 (requestIdToken)
             .requestIdToken(serverClientId)
             // 이메일 주소 요청
             .requestEmail()
+            // 프로필 정보 요청 추가
+            .requestProfile()
             .build()
+        
+        Log.d("LoginViewModel", "GoogleSignInOptions 생성 - serverClientId: $serverClientId")
         GoogleSignIn.getClient(applicationContext, gso)
     }
 
@@ -64,8 +68,11 @@ class LoginViewModel @Inject constructor(
      * Google 로그인 인텐트를 반환합니다.
      */
     fun getSignInIntent(): Intent {
-        // 로그인 시도 전에 이전 로그인 상태 초기화 (선택 사항이지만 권장)
-        // googleSignInClient.signOut() // 필요 시 주석 해제
+        // 로그인 시도 전에 이전 로그인 상태를 초기화하여 항상 로그인 화면이 표시되도록 함
+        googleSignInClient.signOut().addOnCompleteListener {
+            Log.d("LoginViewModel", "이전 Google 로그인 세션 로그아웃 완료")
+        }
+        
         return googleSignInClient.signInIntent
     }
 
@@ -74,33 +81,48 @@ class LoginViewModel @Inject constructor(
      */
     fun handleSignInResult(data: Intent?) {
         _uiState.update { LoginUiState.Loading }
+        
+        // 데이터가 null인 경우 처리
+        if (data == null) {
+            Log.e("LoginViewModel", "로그인 결과 Intent가 null입니다")
+            _uiState.update { LoginUiState.Error("로그인 처리 중 오류가 발생했습니다.") }
+            return
+        }
+        
         val task: Task<GoogleSignInAccount> = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
             val account: GoogleSignInAccount = task.getResult(ApiException::class.java)
             Log.i("LoginViewModel", "Google Sign In successful for: ${account.email}")
+            
             // ID 토큰 가져오기
             val idToken = account.idToken
             if (idToken != null) {
+                Log.d("LoginViewModel", "ID 토큰 획득 성공: ${idToken.substring(0, 15)}...")
                 // 백엔드 인증 및 Room 저장
                 verifyTokenWithBackend(idToken)
             } else {
-                Log.e("LoginViewModel", "Google ID Token is null")
-                _uiState.update { LoginUiState.Error("Google 로그인 정보를 가져오지 못했습니다.") }
+                Log.e("LoginViewModel", "Google ID Token is null - 권한 설정 또는 프로젝트 설정 문제 가능성")
+                _uiState.update { LoginUiState.Error("Google 로그인 정보를 가져오지 못했습니다. (ID 토큰 없음)") }
             }
         } catch (e: ApiException) {
             // 로그인 실패 처리
-            Log.e("LoginViewModel", "Google sign in failed", e)
-            // 사용자 취소(12501), 네트워크 오류(7), 개발자 오류(10) 등 상태 코드 확인 가능
+            Log.e("LoginViewModel", "Google sign in failed with status code: ${e.statusCode}", e)
+            
+            // 사용자 취소(12501), 네트워크 오류(7), 개발자 오류(10, 16) 등 상태 코드 확인
             val errorMessage = when (e.statusCode) {
-                10 -> "앱이 Google에 등록되지 않았거나 설정 오류일 수 있습니다." // DEVELOPER_ERROR
-                7 -> "네트워크 오류가 발생했습니다." // NETWORK_ERROR
+                10 -> "앱이 Google에 등록되지 않았거나 설정 오류입니다. SHA-1 키를 확인하세요." // DEVELOPER_ERROR
+                16 -> "앱에 대한 적절한 인증 설정이 없습니다. Firebase 콘솔에서 SHA-1 키를 확인하세요." // INTERNAL_ERROR
+                7 -> "네트워크 오류가 발생했습니다. 인터넷 연결을 확인하세요." // NETWORK_ERROR
                 12501 -> "로그인이 취소되었습니다." // SIGN_IN_CANCELLED
-                else -> "Google 로그인 중 오류가 발생했습니다. (${e.statusCode})"
+                12500 -> "Google Play 서비스 업데이트가 필요합니다." // SIGN_IN_FAILED
+                else -> "Google 로그인 중 오류가 발생했습니다. (코드: ${e.statusCode})"
             }
+            
+            Log.w("LoginViewModel", "Google 로그인 오류 메시지: $errorMessage")
             _uiState.update { LoginUiState.Error(errorMessage) }
         } catch (e: Exception) {
             Log.e("LoginViewModel", "Error handling sign in result", e)
-            _uiState.update { LoginUiState.Error("로그인 처리 중 알 수 없는 오류가 발생했습니다.") }
+            _uiState.update { LoginUiState.Error("로그인 처리 중 알 수 없는 오류가 발생했습니다: ${e.message}") }
         }
     }
 

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
 }
 
 ksp {
@@ -95,14 +96,9 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Google Sign-In (기존 play-services-auth 버전이 있다면 최신 버전으로 업데이트 고려)
-    implementation("com.google.android.gms:play-services-auth:21.1.0") // 최신 안정 버전 확인
-    implementation("com.google.firebase:firebase-auth:22.2.0")
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
-
-    // Credential Manager (이제 직접 사용하지 않지만, 다른 곳에서 필요할 수 있으므로 일단 유지)
-    // implementation("androidx.credentials:credentials:1.3.0-alpha01")
-    // implementation("androidx.credentials:credentials-play-services-auth:1.3.0-alpha01")
+    // Google Sign-In - 최신 버전으로 통일하고 중복 제거
+    implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경
+    implementation("com.google.firebase:firebase-auth:22.3.0") // 호환되는 Firebase 버전
 
     // Hilt (버전은 프로젝트 상황에 맞게 조정)
     implementation("com.google.dagger:hilt-android:2.51.1")

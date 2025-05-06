@@ -36,7 +36,10 @@ class AuthRepositoryImpl @Inject constructor(
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(serverClientId)
             .requestEmail() // MyPage 등에서 이메일 필요 시 유지
+            .requestProfile() // 프로필 정보도 요청 추가
             .build()
+        
+        println("AuthRepository: GoogleSignInClient 초기화 - serverClientId: ${serverClientId.take(15)}...")
         GoogleSignIn.getClient(context, gso)
     }
 
@@ -49,8 +52,20 @@ class AuthRepositoryImpl @Inject constructor(
             // if (response.isSuccessful && response.body() != null) { ... } else { ... }
 
             // --- 가상 로직 시작 ---
-            println("백엔드로 전송할 ID Token (앞 20자): ${idToken.substring(0, 20)}...")
+            println("AuthRepository: 백엔드로 ID Token 전송 시작 (앞 20자): ${idToken.take(20)}...")
             delay(1500) // 네트워크 딜레이 흉내
+
+            // 현재 로그인된 Google 계정 정보 확인 (디버깅용)
+            try {
+                val account = GoogleSignIn.getLastSignedInAccount(context)
+                if (account != null) {
+                    println("AuthRepository: 현재 로그인된 Google 계정 - 이메일: ${account.email}, ID: ${account.id?.take(10)}")
+                } else {
+                    println("AuthRepository: 현재 로그인된 Google 계정 없음")
+                }
+            } catch (e: Exception) {
+                println("AuthRepository: Google 계정 확인 중 오류 - ${e.message}")
+            }
 
             // 가상의 성공 응답 생성 (실제 백엔드 응답 구조에 맞게 User 모델 생성)
             val simulatedUserId = 12345L
@@ -59,9 +74,9 @@ class AuthRepositoryImpl @Inject constructor(
             val simulatedUser = User(
                 userId = simulatedUserId,
                 nickname = simulatedNickname,
-                deviceId = "temp_device_id_google_auth_repo"
+                deviceId = "google_auth_${System.currentTimeMillis()}"
             )
-            println("백엔드 통신 성공 (가상): User ID=${simulatedUserId}, Nickname=${simulatedNickname}")
+            println("AuthRepository: 백엔드 통신 성공 (가상): User ID=${simulatedUserId}, Nickname=${simulatedNickname}")
             Result.success(simulatedUser)
             // --- 가상 로직 끝 ---
 
@@ -70,7 +85,7 @@ class AuthRepositoryImpl @Inject constructor(
             // --- ---
         } catch (e: Exception) {
             // 네트워크 오류 또는 기타 예외 처리
-            println("백엔드 통신 중 오류 발생 (가상): ${e.message}")
+            println("AuthRepository: 백엔드 통신 중 오류 발생: ${e.message}")
             Result.failure(e)
         }
     }
@@ -78,13 +93,33 @@ class AuthRepositoryImpl @Inject constructor(
     // signOut 함수 구현
     override suspend fun signOut(): Result<Unit> {
         return try {
-            googleSignInClient.signOut().await() // Google 로그아웃
-            // FIXME: UserRepository에 clearUser() 함수 구현 필요
-            // userRepository.clearUser() // 로컬 DB 사용자 정보 삭제
-            println("AuthRepo: Google 로그아웃 및 로컬 데이터 삭제 (가상) 성공")
+            println("AuthRepository: 로그아웃 시작")
+            
+            // 1. 로그인된 계정 정보 확인 (디버깅용)
+            val account = GoogleSignIn.getLastSignedInAccount(context)
+            if (account != null) {
+                println("AuthRepository: 로그아웃할 계정 - 이메일: ${account.email}")
+            } else {
+                println("AuthRepository: 로그아웃할 계정 없음 (이미 로그아웃 상태)")
+            }
+            
+            // 2. Google 로그아웃 실행
+            googleSignInClient.signOut().await()
+            
+            // 3. 로그아웃 후 상태 확인 (선택 사항이지만 디버깅에 유용)
+            val accountAfterSignOut = GoogleSignIn.getLastSignedInAccount(context)
+            if (accountAfterSignOut == null) {
+                println("AuthRepository: Google 로그아웃 성공 확인")
+            } else {
+                println("AuthRepository: 주의 - 로그아웃 후에도 계정이 남아있음")
+            }
+            
+            // 4. 로컬 DB 사용자 정보 삭제 (UserRepository 확장 필요)
+            // userRepository.clearUser() 
+            
             Result.success(Unit)
         } catch (e: Exception) {
-            println("AuthRepo: 로그아웃 중 오류 발생: ${e.message}")
+            println("AuthRepository: 로그아웃 중 오류 발생: ${e.message}")
             Result.failure(e)
         }
     }
