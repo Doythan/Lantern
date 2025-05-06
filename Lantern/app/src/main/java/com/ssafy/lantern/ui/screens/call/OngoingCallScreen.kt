@@ -5,9 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.ContentAlpha
 import androidx.compose.material.Icon
+import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,12 +26,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lantern.R
 import com.ssafy.lantern.ui.theme.LanternTheme
+import com.ssafy.lantern.ui.util.getProfileImageResId
 import kotlinx.coroutines.delay
 
 // 통화 중 화면
 @Composable
 fun OngoingCallScreen(
     callerName: String,
+    callerId: Int = 1,
     onEndCallClick: () -> Unit
 ) {
     var callDuration by remember { mutableStateOf(0) }
@@ -50,7 +58,7 @@ fun OngoingCallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(MaterialTheme.colors.background)
     ) {
         Column(
             modifier = Modifier
@@ -66,28 +74,27 @@ fun OngoingCallScreen(
             ) {
                 Text(
                     text = callerName,
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colors.onBackground,
+                    style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold)
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
                     text = formattedDuration,
-                    color = Color.Gray,
-                    fontSize = 16.sp
+                    color = MaterialTheme.colors.onBackground.copy(alpha = ContentAlpha.medium),
+                    style = MaterialTheme.typography.body1
                 )
             }
             
             // 중앙 프로필
             Image(
-                painter = painterResource(id = R.drawable.lantern_image),
+                painter = painterResource(id = getProfileImageResId(callerId)),
                 contentDescription = "Caller Profile",
                 modifier = Modifier
                     .size(200.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFFD700))
+                    .background(MaterialTheme.colors.surface)
             )
             
             // 하단 통화 컨트롤
@@ -102,6 +109,11 @@ fun OngoingCallScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
+                    val inactiveButtonColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
+                    val activeButtonColor = MaterialTheme.colors.primary
+                    val inactiveIconColor = MaterialTheme.colors.onSurface
+                    val activeIconColor = MaterialTheme.colors.onPrimary
+
                     // 스피커 버튼
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
@@ -109,13 +121,12 @@ fun OngoingCallScreen(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
+                                .clip(CircleShape)
                                 .background(
-                                    if (isSpeakerOn) Color(0xFFFFD700) else Color.DarkGray,
-                                    CircleShape
+                                    if (isSpeakerOn) activeButtonColor else inactiveButtonColor,
                                 )
                                 .clickable { 
                                     isSpeakerOn = !isSpeakerOn
-                                    // 스피커를 켜면 음소거는 자동으로 해제
                                     if (isSpeakerOn) {
                                         isMuted = false
                                     }
@@ -123,9 +134,9 @@ fun OngoingCallScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                painter = painterResource(id = android.R.drawable.ic_lock_silent_mode_off),
+                                imageVector = Icons.Filled.VolumeUp,
                                 contentDescription = "Speaker",
-                                tint = if (isSpeakerOn) Color.Black else Color.White,
+                                tint = if (isSpeakerOn) activeIconColor else inactiveIconColor,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -134,8 +145,8 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "스피커",
-                            color = Color.White,
-                            fontSize = 12.sp
+                            color = MaterialTheme.colors.onBackground,
+                            style = MaterialTheme.typography.caption
                         )
                     }
                     
@@ -146,13 +157,12 @@ fun OngoingCallScreen(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
+                                .clip(CircleShape)
                                 .background(
-                                    if (isMuted) Color(0xFFFFD700) else Color.DarkGray,
-                                    CircleShape
+                                    if (isMuted) activeButtonColor else inactiveButtonColor,
                                 )
                                 .clickable { 
                                     isMuted = !isMuted
-                                    // 음소거를 켜면 스피커는 자동으로 해제
                                     if (isMuted) {
                                         isSpeakerOn = false
                                     }
@@ -160,9 +170,9 @@ fun OngoingCallScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                painter = painterResource(id = android.R.drawable.ic_lock_silent_mode),
+                                imageVector = Icons.Filled.MicOff,
                                 contentDescription = "Mute",
-                                tint = if (isMuted) Color.Black else Color.White,
+                                tint = if (isMuted) activeIconColor else inactiveIconColor,
                                 modifier = Modifier.size(28.dp)
                             )
                         }
@@ -171,8 +181,8 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "음소거",
-                            color = Color.White,
-                            fontSize = 12.sp
+                            color = MaterialTheme.colors.onBackground,
+                            style = MaterialTheme.typography.caption
                         )
                     }
                 }
@@ -183,14 +193,15 @@ fun OngoingCallScreen(
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .background(Color.Red, CircleShape)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colors.error)
                         .clickable(onClick = onEndCallClick),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painter = painterResource(id = android.R.drawable.ic_menu_call),
+                        imageVector = Icons.Filled.CallEnd,
                         contentDescription = "End Call",
-                        tint = Color.White,
+                        tint = MaterialTheme.colors.onError,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -205,10 +216,11 @@ fun OngoingCallScreenPreview() {
     LanternTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color.Black
+            color = MaterialTheme.colors.background
         ) {
             OngoingCallScreen(
                 callerName = "도경원",
+                callerId = 1,
                 onEndCallClick = {}
             )
         }

@@ -1,17 +1,20 @@
 package com.ssafy.lantern.ui.navigation
 
-import androidx.compose.foundation.layout.PaddingValues // PaddingValues 임포트 확인
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.ssafy.lantern.ui.common.MainScaffold // MainScaffold 임포트
-import com.ssafy.lantern.ui.screens.call.CallHistoryScreen // 필요 시 사용
 import com.ssafy.lantern.ui.screens.call.FriendListScreen
 import com.ssafy.lantern.ui.screens.call.IncomingCallScreen
 import com.ssafy.lantern.ui.screens.call.OngoingCallScreen
 import com.ssafy.lantern.ui.screens.chat.ChatScreen // ChatScreen 임포트
 import com.ssafy.lantern.ui.screens.chat.ChatListScreen // ChatListScreen 임포트
+import com.ssafy.lantern.ui.screens.chat.DirectChatScreen
+import com.ssafy.lantern.ui.screens.chat.PublicChatScreen
 import com.ssafy.lantern.ui.screens.login.LoginScreen
 import com.ssafy.lantern.ui.screens.mypage.MyPageScreen
 import com.ssafy.lantern.ui.screens.signup.SignupScreen
@@ -26,6 +29,12 @@ object AppDestinations {
     const val INCOMING_CALL_ROUTE = "incomingcall"
     const val ONGOING_CALL_ROUTE = "ongoingcall"
     const val HOME_ROUTE = "home" // 채팅 목록 (하단 탭) - 기존 메인 역할
+
+    // 새로운 채팅 라우트
+    const val PUBLIC_CHAT_ROUTE = "public_chat"
+    const val DIRECT_CHAT_ROUTE = "direct_chat/{userId}" // 사용자 ID 파라미터 포함
+    const val DIRECT_CHAT_ARG_USER_ID = "userId"
+
     // 다른 라우트 추가 가능
 }
 
@@ -77,7 +86,10 @@ fun AppNavigation() {
         // 홈(채팅 목록) 화면 (네비게이션 바 포함)
         composable(AppDestinations.HOME_ROUTE) {
             MainScaffold(navController = navController) { paddingValues ->
-                ChatListScreen(paddingValues = paddingValues) // MainScaffold 내부 컨텐츠
+                ChatListScreen(
+                    paddingValues = paddingValues,
+                    navController = navController // NavController 전달
+                )
             }
         }
 
@@ -139,6 +151,30 @@ fun AppNavigation() {
                      }
                  }
              )
+        }
+
+        // 공용 채팅 화면
+        composable(AppDestinations.PUBLIC_CHAT_ROUTE) {
+            PublicChatScreen(
+                // 필요 시 NavController 전달
+                 navController = navController // NavController 전달
+            )
+        }
+
+        // 1:1 채팅 화면 (userId 인자 받음)
+        composable(
+            route = AppDestinations.DIRECT_CHAT_ROUTE,
+            arguments = listOf(navArgument(AppDestinations.DIRECT_CHAT_ARG_USER_ID) { type = NavType.StringType }) // Int 타입이면 NavType.IntType
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString(AppDestinations.DIRECT_CHAT_ARG_USER_ID)
+            if (userId != null) {
+                DirectChatScreen(
+                     userId = userId,
+                     navController = navController // NavController 전달
+                )
+            } else {
+                Text("Error: User ID not found.")
+            }
         }
 
         // 다른 화면들에 대한 composable 추가 가능

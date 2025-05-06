@@ -4,8 +4,13 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.Icon
-import androidx.compose.material.Text
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CallMade
+import androidx.compose.material.icons.filled.CallMissed
+import androidx.compose.material.icons.filled.CallReceived
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,10 +19,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lantern.data.model.FriendCallItem
-import android.R
+import com.ssafy.lantern.R
+import com.ssafy.lantern.ui.components.ProfileAvatar
+import com.ssafy.lantern.ui.util.getProfileImageResId
 
 /**
  * 통화 기록 아이템 컴포넌트
@@ -27,21 +35,12 @@ fun FriendCallItem(friend: FriendCallItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(80.dp)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Profile Image
-        Image(
-            painter = painterResource(id = friend.profileImage),
-            contentDescription = "Profile Image",
-            modifier = Modifier
-                .size(50.dp)
-                .clip(CircleShape)
-                .background(Color(0xFFFFD700))
-        )
+        ProfileAvatar(profileId = friend.id)
         
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         
         // Friend Info
         Column(
@@ -49,9 +48,10 @@ fun FriendCallItem(friend: FriendCallItem) {
         ) {
             Text(
                 text = friend.name,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium
+                color = if (friend.callType == "부재중전화") MaterialTheme.colors.error else MaterialTheme.colors.onSurface,
+                style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Medium),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             
             Spacer(modifier = Modifier.height(4.dp))
@@ -60,43 +60,45 @@ fun FriendCallItem(friend: FriendCallItem) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    painter = when(friend.callType) {
-                        "발신전화" -> painterResource(id = R.drawable.sym_call_outgoing)
-                        "수신전화" -> painterResource(id = R.drawable.sym_call_incoming)
-                        else -> painterResource(id = R.drawable.sym_call_missed)
+                    imageVector = when (friend.callType) {
+                        "발신전화" -> Icons.Default.CallMade
+                        "수신전화" -> Icons.Default.CallReceived
+                        else -> Icons.Default.CallMissed
                     },
                     contentDescription = "Call Type",
-                    tint = Color.Gray,
-                    modifier = Modifier.size(14.dp)
+                    tint = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
+                    modifier = Modifier.size(16.dp)
                 )
                 
                 Spacer(modifier = Modifier.width(4.dp))
                 
                 Text(
                     text = friend.callType,
-                    color = Color.Gray,
-                    fontSize = 14.sp
+                    color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
+                    style = MaterialTheme.typography.caption
                 )
             }
         }
         
-        // Timestamp
+        Spacer(modifier = Modifier.width(8.dp))
+        
+        // Timestamp & Info
         Column(
             horizontalAlignment = Alignment.End
         ) {
             Text(
                 text = friend.timestamp,
-                color = if (friend.isRecent) Color.White else Color.Gray,
-                fontSize = 12.sp
+                color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
+                style = MaterialTheme.typography.caption
             )
             
             Spacer(modifier = Modifier.height(4.dp))
             
             // Info Button
             Icon(
-                painter = painterResource(id = R.drawable.ic_dialog_info),
+                imageVector = Icons.Filled.Info,
                 contentDescription = "Info",
-                tint = Color(0xFF3D84FF),
+                tint = MaterialTheme.colors.primary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -121,22 +123,21 @@ fun SimpleProfileField(
         // Label
         Text(
             text = label,
-            color = Color.Gray,
-            fontSize = 14.sp,
-            modifier = Modifier.padding(bottom = 4.dp)
+            color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
+            style = MaterialTheme.typography.caption
         )
         
         // Content Box
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(24.dp)
+                .padding(vertical = 4.dp)
         ) {
             // 일반 모드 (편집 불가)
             Text(
                 text = value,
-                color = Color.White,
-                fontSize = 16.sp,
+                color = MaterialTheme.colors.onSurface,
+                style = MaterialTheme.typography.body1,
                 modifier = Modifier
                     .fillMaxWidth()
                     .alpha(if (isEditing) 0f else 1f)
@@ -144,12 +145,11 @@ fun SimpleProfileField(
             
             // 편집 모드
             if (isEditing) {
-                androidx.compose.foundation.text.BasicTextField(
+                BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        color = Color.White,
-                        fontSize = 16.sp
+                    textStyle = MaterialTheme.typography.body1.copy(
+                        color = MaterialTheme.colors.onSurface
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -157,12 +157,10 @@ fun SimpleProfileField(
         }
         
         // Divider
-        Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(if (isEditing) Color(0xFFFFD700) else Color.DarkGray)
-                .padding(top = 8.dp)
+        Divider(
+            modifier = Modifier.padding(top = 4.dp),
+            color = if (isEditing) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
+            thickness = 1.dp
         )
     }
 }

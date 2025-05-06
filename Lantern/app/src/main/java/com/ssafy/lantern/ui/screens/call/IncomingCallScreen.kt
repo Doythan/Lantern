@@ -5,10 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lantern.R
 import com.ssafy.lantern.ui.theme.LanternTheme
+import com.ssafy.lantern.ui.util.getProfileImageResId
 
 /**
  * 전화 수신 화면
@@ -29,68 +30,63 @@ import com.ssafy.lantern.ui.theme.LanternTheme
 @Composable
 fun IncomingCallScreen(
     callerName: String,
+    callerId: Int = 1,
     onRejectClick: () -> Unit,
     onAcceptClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colors.background)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(64.dp))
         
-        // 발신자 프로필 이미지
         Image(
-            painter = painterResource(id = R.drawable.lantern_image),
+            painter = painterResource(id = getProfileImageResId(callerId)),
             contentDescription = "Caller Profile",
             modifier = Modifier
                 .size(200.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFFFD700))
+                .background(MaterialTheme.colors.surface)
         )
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // 발신자 이름
         Text(
             text = callerName,
-            color = Color.White,
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold
+            color = MaterialTheme.colors.onBackground,
+            style = MaterialTheme.typography.h4.copy(fontWeight = FontWeight.Bold)
         )
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        
-        
         Spacer(modifier = Modifier.weight(1f))
         
-        // 통화 버튼 영역
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 32.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            // 거절 버튼
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
                     onClick = onRejectClick,
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color.Red
+                        backgroundColor = MaterialTheme.colors.error
                     ),
                     shape = CircleShape,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = android.R.drawable.ic_menu_call),
+                    Icon(
+                        imageVector = Icons.Filled.CallEnd,
                         contentDescription = "Reject Call",
-                        modifier = Modifier
-                            .size(65.dp)
-                            .padding(4.dp)
+                        tint = MaterialTheme.colors.onError,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
                 
@@ -98,29 +94,28 @@ fun IncomingCallScreen(
                 
                 Text(
                     text = "거절",
-                    color = Color.White,
-                    fontSize = 20.sp
+                    color = MaterialTheme.colors.onBackground,
+                    style = MaterialTheme.typography.button
                 )
             }
             
-            // 수락 버튼
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Button(
                     onClick = onAcceptClick,
                     colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color.Green
+                        backgroundColor = Color(0xFF4CAF50)
                     ),
                     shape = CircleShape,
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(64.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
-                    Image(
-                        painter = painterResource(id = android.R.drawable.ic_menu_call),
+                    Icon(
+                        imageVector = Icons.Filled.Call,
                         contentDescription = "Accept Call",
-                        modifier = Modifier
-                            .size(65.dp)
-                            .padding(4.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
                     )
                 }
                 
@@ -128,8 +123,8 @@ fun IncomingCallScreen(
                 
                 Text(
                     text = "수락",
-                    color = Color.White,
-                    fontSize = 20.sp
+                    color = MaterialTheme.colors.onBackground,
+                    style = MaterialTheme.typography.button
                 )
             }
         }
@@ -142,10 +137,11 @@ fun IncomingCallScreenPreview() {
     LanternTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color.Black
+            color = MaterialTheme.colors.background
         ) {
             IncomingCallScreen(
                 callerName = "도경원",
+                callerId = 1,
                 onRejectClick = {},
                 onAcceptClick = {}
             )

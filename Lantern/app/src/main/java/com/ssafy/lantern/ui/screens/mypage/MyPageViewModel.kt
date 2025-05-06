@@ -25,9 +25,13 @@ data class MyPageUiState(
     val availableProfileImages: List<Int> = defaultProfileImages
 )
 
-// 임시로 단일 이미지 사용
+// 사용할 프로필 이미지 리소스 ID 목록 정의
 val defaultProfileImages: List<Int> = listOf(
-    R.drawable.lantern_image
+    R.drawable.profile_1, R.drawable.profile_2, R.drawable.profile_3,
+    R.drawable.profile_4, R.drawable.profile_5, R.drawable.profile_6,
+    R.drawable.profile_7, R.drawable.profile_8, R.drawable.profile_9,
+    R.drawable.profile_10, R.drawable.profile_11, R.drawable.profile_12,
+    R.drawable.profile_13, R.drawable.profile_14, R.drawable.profile_15
 )
 
 @HiltViewModel

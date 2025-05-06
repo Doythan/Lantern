@@ -2,6 +2,7 @@ package com.ssafy.lantern.ui.screens.signup
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -26,6 +27,7 @@ fun SignupScreen(onBackToLoginClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colors.background)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -35,32 +37,30 @@ fun SignupScreen(onBackToLoginClick: () -> Unit) {
             painter = painterResource(id = R.drawable.lantern_image),
             contentDescription = "Lantern Logo",
             modifier = Modifier
-                .size(250.dp)
+                .size(200.dp)
                 .padding(bottom = 16.dp)
         )
         
         // App Name
         Text(
             text = "LANTERN",
-            color = Color(0xFFFFD700),
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 32.dp)
+            color = MaterialTheme.colors.primary,
+            style = MaterialTheme.typography.h4.copy(fontWeight = FontWeight.Bold)
         )
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(48.dp))
         
         // Google 회원가입 버튼
         OutlinedButton(
-            onClick = { /* Google 회원가입 로직 */ },
+            onClick = { /* TODO: Google 회원가입 로직 */ },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
             colors = ButtonDefaults.outlinedButtonColors(
-                backgroundColor = Color.White,
-                contentColor = Color.Black
+                backgroundColor = MaterialTheme.colors.surface,
+                contentColor = MaterialTheme.colors.onSurface
             ),
-            border = BorderStroke(1.dp, Color.LightGray)
+            border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically
@@ -75,7 +75,7 @@ fun SignupScreen(onBackToLoginClick: () -> Unit) {
                 
                 Text(
                     text = "Google로 회원가입",
-                    fontSize = 16.sp
+                    style = MaterialTheme.typography.button
                 )
             }
         }
@@ -89,8 +89,8 @@ fun SignupScreen(onBackToLoginClick: () -> Unit) {
         ) {
             Text(
                 text = "이미 회원가입하셨나요? 로그인하기",
-                color = Color(0xFFFFD700),
-                fontSize = 16.sp,
+                color = MaterialTheme.colors.primary,
+                style = MaterialTheme.typography.button,
                 textAlign = TextAlign.Center
             )
         }
@@ -103,7 +103,7 @@ fun SignupScreenPreview() {
     LanternTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color.Black
+            color = MaterialTheme.colors.background
         ) {
             SignupScreen(
                 onBackToLoginClick = {}

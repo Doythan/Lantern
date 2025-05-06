@@ -75,7 +75,10 @@ fun LoginScreen(
         }
     }
 
-    Scaffold(scaffoldState = scaffoldState) { paddingValues ->
+    Scaffold(
+        scaffoldState = scaffoldState,
+        backgroundColor = MaterialTheme.colors.background
+    ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -89,19 +92,17 @@ fun LoginScreen(
                     painter = painterResource(id = R.drawable.lantern_image),
                     contentDescription = "Lantern Logo",
                     modifier = Modifier
-                        .size(250.dp)
+                        .size(200.dp)
                         .padding(bottom = 16.dp)
                 )
                 
                 Text(
                     text = "LANTERN",
-                    color = Color(0xFFFFD700),
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 32.dp)
+                    color = MaterialTheme.colors.primary,
+                    style = MaterialTheme.typography.h4.copy(fontWeight = FontWeight.Bold)
                 )
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp))
                 
                 OutlinedButton(
                     enabled = uiState !is LoginUiState.Loading,
@@ -113,10 +114,10 @@ fun LoginScreen(
                         .fillMaxWidth()
                         .height(50.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        backgroundColor = Color.White,
-                        contentColor = Color.Black
+                        backgroundColor = MaterialTheme.colors.surface,
+                        contentColor = MaterialTheme.colors.onSurface
                     ),
-                    border = BorderStroke(1.dp, Color.LightGray)
+                    border = BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = 0.12f))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -131,13 +132,14 @@ fun LoginScreen(
                         
                         Text(
                             text = "Google로 로그인",
-                            fontSize = 16.sp
+                            style = MaterialTheme.typography.button
                         )
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
+                val testButtonColor = MaterialTheme.colors.primary
                 OutlinedButton(
                     onClick = onMyPageClick,
                     modifier = Modifier
@@ -145,15 +147,14 @@ fun LoginScreen(
                         .height(50.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         backgroundColor = Color.Transparent,
-                        contentColor = Color(0xFFFFD700)
+                        contentColor = testButtonColor
                     ),
-                    border = BorderStroke(1.dp, Color(0xFFFFD700)),
+                    border = BorderStroke(1.dp, testButtonColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "마이페이지 (테스트)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.button
                     )
                 }
                 
@@ -166,15 +167,14 @@ fun LoginScreen(
                         .height(50.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         backgroundColor = Color.Transparent,
-                        contentColor = Color(0xFFFFD700)
+                        contentColor = testButtonColor
                     ),
-                    border = BorderStroke(1.dp, Color(0xFFFFD700)),
+                    border = BorderStroke(1.dp, testButtonColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "최근 통화 (테스트)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.button
                     )
                 }
                 
@@ -187,15 +187,14 @@ fun LoginScreen(
                         .height(50.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         backgroundColor = Color.Transparent,
-                        contentColor = Color(0xFFFFD700)
+                        contentColor = testButtonColor
                     ),
-                    border = BorderStroke(1.dp, Color(0xFFFFD700)),
+                    border = BorderStroke(1.dp, testButtonColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "전화 수신 화면 (테스트)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.button
                     )
                 }
 
@@ -208,15 +207,14 @@ fun LoginScreen(
                         .height(50.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         backgroundColor = Color.Transparent,
-                        contentColor = Color(0xFFFFD700)
+                        contentColor = testButtonColor
                     ),
-                    border = BorderStroke(1.dp, Color(0xFFFFD700)),
+                    border = BorderStroke(1.dp, testButtonColor),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
                         text = "홈 화면 (테스트)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.button
                     )
                 }
                 
@@ -228,8 +226,8 @@ fun LoginScreen(
                 ) {
                     Text(
                         text = "아이디가 없으신가요? 회원가입하기",
-                        color = Color(0xFFFFD700),
-                        fontSize = 16.sp,
+                        color = MaterialTheme.colors.primary,
+                        style = MaterialTheme.typography.button,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -238,7 +236,7 @@ fun LoginScreen(
             if (uiState is LoginUiState.Loading) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
-                    color = Color(0xFFFFD700)
+                    color = MaterialTheme.colors.primary
                 )
             }
         }
@@ -249,18 +247,9 @@ fun LoginScreen(
 @Composable
 fun LoginScreenPreview() {
     LanternTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color.Black
-        ) {
-            LoginScreen(
-                onSignUpClick = {},
-                onMyPageClick = {},
-                onFriendListClick = {},
-                onIncomingCallClick = {},
-                onHomeClick = {},
-                onLoginSuccess = {}
-            )
-        }
+        LoginScreen(
+            onSignUpClick = {}, onMyPageClick = {}, onFriendListClick = {},
+            onIncomingCallClick = {}, onHomeClick = {}, onLoginSuccess = {}
+        )
     }
 }
