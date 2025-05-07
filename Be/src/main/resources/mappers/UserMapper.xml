@@ -2,6 +2,31 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.example.be.mapper.UserMapper">
+<mapper namespace="com.example.be.login.mapper.UserMapper">
+
+    <!-- 1. User 엔티티와 컬럼 매핑 -->
+    <resultMap id="UserResultMap" type="com.example.be.login.entity.User">
+        <id     property="userId"   column="user_id"/>
+        <result property="email"    column="email"/>
+        <result property="nickName" column="nickname"/>
+    </resultMap>
+
+    <!-- 2. 이메일로 사용자 조회 -->
+    <select id="selectByEmail"
+            parameterType="string"
+            resultMap="UserResultMap">
+        SELECT user_id, email, nickname
+        FROM user
+        WHERE email = #{email}
+    </select>
+
+    <!-- 3. 신규 사용자 삽입 (auto-generated key 사용) -->
+    <insert id="insertUser"
+            parameterType="com.example.be.login.entity.User"
+            useGeneratedKeys="true"
+            keyProperty="userId">
+        INSERT INTO user (email, nickname)
+        VALUES (#{email}, #{nickName})
+    </insert>
 
 </mapper>

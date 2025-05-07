@@ -1,0 +1,42 @@
+google:
+  client-id: 29551623954-mece6ts82f7ul4iirsco5c4ah6siq646.apps.googleusercontent.com
+  client-secret: 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
+
+
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://3.36.122.131/lantern?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: lantern!
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${google.client-id}
+            client-secret: ${google.client-secret}
+            redirect-uri: https://localhost:8080/googlelogin/oauth2/code/google
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          google:
+            issuer-uri: https://accounts.google.com
+
+jwt:
+  secret: "tG3K8vE1uZ6sY9xN4pQ2bR7fJ0mLHk11"
+  expiration-ms: 604800000
+
+
+mybatis:
+  # Mapper XML 파일 위치 (classpath 기준)
+  mapper-locations: classpath:/mappers/*.xml
+  # 도메인 모델(VO/DTO) 패키지 스캔
+  type-aliases-package: com.example.be.login.dto
+  # 아래 옵션을 켜면 snake_case 컬럼 → camelCase 프로퍼티 매핑이 자동으로 됩니다.
+  configuration:
+    map-underscore-to-camel-case: true
