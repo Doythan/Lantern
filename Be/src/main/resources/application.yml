@@ -33,10 +33,10 @@ jwt:
 
 
 mybatis:
-  # Mapper XML 파일 위치 (classpath 기준)
   mapper-locations: classpath:/mappers/*.xml
-  # 도메인 모델(VO/DTO) 패키지 스캔
   type-aliases-package: com.example.be.login.dto
-  # 아래 옵션을 켜면 snake_case 컬럼 → camelCase 프로퍼티 매핑이 자동으로 됩니다.
   configuration:
     map-underscore-to-camel-case: true
+
+server:
+  port: 8080
