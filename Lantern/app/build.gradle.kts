@@ -3,7 +3,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
     id("com.google.dagger.hilt.android")
-    id("com.google.gms.google-services")
 }
 
 ksp {
@@ -12,10 +11,10 @@ ksp {
 }
 
 android {
-    namespace = "com.ssafy.lantern"
+    namespace = "com.ssafy.lanterns"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.ssafy.lantern"
+        applicationId = "com.ssafy.lanterns"
         minSdk = 33
         targetSdk = 34
         versionCode = 1
@@ -105,9 +104,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Google Sign-In - 최신 버전으로 통일하고 중복 제거
+    // Google Sign-In - Firebase 의존성 제거
     implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경
-    implementation("com.google.firebase:firebase-auth:22.3.0") // 호환되는 Firebase 버전
 
     // Hilt (버전은 프로젝트 상황에 맞게 조정)
     implementation("com.google.dagger:hilt-android:2.51.1")
