@@ -1,126 +1,28 @@
 package com.ssafy.lantern.data.repository
 
-import android.content.Context
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.ssafy.lantern.R
 import com.ssafy.lantern.data.model.User
-import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.tasks.await
-import javax.inject.Inject
-import javax.inject.Singleton
 
-interface AuthRepository {
-    // 백엔드에 ID 토큰을 보내 검증하고 사용자 정보를 받아오는 함수
-    suspend fun verifyGoogleTokenAndLogin(idToken: String): Result<User>
-
-    // 로그아웃 함수 시그니처 추가
-    suspend fun signOut(): Result<Unit>
+sealed class AuthResult<out T> {
+    data class Success<T>(val data: T) : AuthResult<T>()
+    data class Error(val message: String) : AuthResult<Nothing>()
+    object Loading : AuthResult<Nothing>()
 }
 
-// Hilt Singleton으로 지정
-@Singleton
-class AuthRepositoryImpl @Inject constructor(
-    // Application Context 주입
-    @ApplicationContext private val context: Context,
-    // UserRepository 주입 (DataModule 등에서 제공되어야 함)
-    private val userRepository: UserRepository
-) : AuthRepository {
-
-    // GoogleSignInClient 인스턴스 (지연 초기화)
-    private val googleSignInClient: GoogleSignInClient by lazy {
-        // strings.xml에서 Web Client ID 가져오기
-        val serverClientId = context.getString(R.string.your_web_client_id)
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(serverClientId)
-            .requestEmail() // MyPage 등에서 이메일 필요 시 유지
-            .requestProfile() // 프로필 정보도 요청 추가
-            .build()
-        
-        println("AuthRepository: GoogleSignInClient 초기화 - serverClientId: ${serverClientId.take(15)}...")
-        GoogleSignIn.getClient(context, gso)
-    }
-
-    override suspend fun verifyGoogleTokenAndLogin(idToken: String): Result<User> {
-        return try {
-            // --- 실제 구현 시 이 부분을 수정 --- 
-            // 1. Retrofit 등을 사용하여 백엔드 API 호출
-            // 예: val response = apiService.verifyGoogleToken(mapOf("idToken" to idToken))
-            // 2. 응답 성공/실패 처리
-            // if (response.isSuccessful && response.body() != null) { ... } else { ... }
-
-            // --- 가상 로직 시작 ---
-            println("AuthRepository: 백엔드로 ID Token 전송 시작 (앞 20자): ${idToken.take(20)}...")
-            delay(1500) // 네트워크 딜레이 흉내
-
-            // 현재 로그인된 Google 계정 정보 확인 (디버깅용)
-            try {
-                val account = GoogleSignIn.getLastSignedInAccount(context)
-                if (account != null) {
-                    println("AuthRepository: 현재 로그인된 Google 계정 - 이메일: ${account.email}, ID: ${account.id?.take(10)}")
-                } else {
-                    println("AuthRepository: 현재 로그인된 Google 계정 없음")
-                }
-            } catch (e: Exception) {
-                println("AuthRepository: Google 계정 확인 중 오류 - ${e.message}")
-            }
-
-            // 가상의 성공 응답 생성 (실제 백엔드 응답 구조에 맞게 User 모델 생성)
-            val simulatedUserId = 12345L
-            val simulatedNickname = "Google로그인유저"
-            // deviceId는 백엔드에서 오지 않는다고 가정 -> 임시값 또는 빈 값 사용
-            val simulatedUser = User(
-                userId = simulatedUserId,
-                nickname = simulatedNickname,
-                deviceId = "google_auth_${System.currentTimeMillis()}"
-            )
-            println("AuthRepository: 백엔드 통신 성공 (가상): User ID=${simulatedUserId}, Nickname=${simulatedNickname}")
-            Result.success(simulatedUser)
-            // --- 가상 로직 끝 ---
-
-            // --- 가상 실패 처리 예시 ---
-            // Result.failure(Exception("백엔드 인증 실패 (가상)"))
-            // --- ---
-        } catch (e: Exception) {
-            // 네트워크 오류 또는 기타 예외 처리
-            println("AuthRepository: 백엔드 통신 중 오류 발생: ${e.message}")
-            Result.failure(e)
-        }
-    }
-
-    // signOut 함수 구현
-    override suspend fun signOut(): Result<Unit> {
-        return try {
-            println("AuthRepository: 로그아웃 시작")
-            
-            // 1. 로그인된 계정 정보 확인 (디버깅용)
-            val account = GoogleSignIn.getLastSignedInAccount(context)
-            if (account != null) {
-                println("AuthRepository: 로그아웃할 계정 - 이메일: ${account.email}")
-            } else {
-                println("AuthRepository: 로그아웃할 계정 없음 (이미 로그아웃 상태)")
-            }
-            
-            // 2. Google 로그아웃 실행
-            googleSignInClient.signOut().await()
-            
-            // 3. 로그아웃 후 상태 확인 (선택 사항이지만 디버깅에 유용)
-            val accountAfterSignOut = GoogleSignIn.getLastSignedInAccount(context)
-            if (accountAfterSignOut == null) {
-                println("AuthRepository: Google 로그아웃 성공 확인")
-            } else {
-                println("AuthRepository: 주의 - 로그아웃 후에도 계정이 남아있음")
-            }
-            
-            // 4. 로컬 DB 사용자 정보 삭제 (UserRepository 확장 필요)
-            // userRepository.clearUser() 
-            
-            Result.success(Unit)
-        } catch (e: Exception) {
-            println("AuthRepository: 로그아웃 중 오류 발생: ${e.message}")
-            Result.failure(e)
-        }
-    }
+interface AuthRepository {
+    // 구글 ID 토큰으로 로그인
+    suspend fun googleLogin(idToken: String): AuthResult<User>
+    
+    // 로그아웃
+    suspend fun logout(): AuthResult<Unit>
+    
+    // 로그아웃 (기존 호환성 유지를 위한 메서드)
+    suspend fun signOut(): AuthResult<Unit>
+    
+    // 로그인 상태 확인
+    suspend fun isLoggedIn(): Boolean
+    
+    // 현재 로그인된 사용자 정보 조회
+    suspend fun getCurrentUserId(): Long?
+    suspend fun getCurrentUserEmail(): String?
+    suspend fun getCurrentUserNickname(): String?
 } 

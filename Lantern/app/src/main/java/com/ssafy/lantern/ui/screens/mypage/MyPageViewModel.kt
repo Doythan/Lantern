@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.ssafy.lantern.R // 리소스 ID 접근
 import com.ssafy.lantern.data.model.User
 import com.ssafy.lantern.data.repository.AuthRepository // AuthRepository 임포트
+import com.ssafy.lantern.data.repository.AuthResult // AuthResult 임포트 추가
 import com.ssafy.lantern.data.repository.UserRepository
 // import com.ssafy.lantern.ui.screens.login.LoginViewModel // LoginViewModel 임포트 제거
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -162,11 +163,17 @@ class MyPageViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) } // 로딩 상태 표시 (선택 사항)
             val result = authRepository.signOut() // AuthRepository의 signOut 호출
-            if (result.isSuccess) {
-                _logoutEvent.emit(Unit) // 성공 시 이벤트 발생
-            } else {
-                // 실패 시 에러 메시지 표시
-                _uiState.update { it.copy(isLoading = false, errorMessage = "로그아웃 실패: ${result.exceptionOrNull()?.message}") }
+            when (result) {
+                is AuthResult.Success -> {
+                    _logoutEvent.emit(Unit) // 성공 시 이벤트 발생
+                }
+                is AuthResult.Error -> {
+                    // 실패 시 에러 메시지 표시
+                    _uiState.update { it.copy(isLoading = false, errorMessage = "로그아웃 실패: ${result.message}") }
+                }
+                AuthResult.Loading -> {
+                    // Loading 상태 처리 (필요한 경우)
+                }
             }
         }
     }

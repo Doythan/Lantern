@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.lantern.R
 import com.ssafy.lantern.ui.theme.LanternTheme
@@ -104,6 +103,7 @@ fun LoginScreen(
                 
                 Spacer(modifier = Modifier.height(48.dp))
                 
+                // 구글 로그인 버튼
                 OutlinedButton(
                     enabled = uiState !is LoginUiState.Loading,
                     onClick = {

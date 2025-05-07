@@ -87,6 +87,15 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     implementation(libs.androidx.room.paging)
 
+    // Retrofit & OkHttp for network calls
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    
+    // DataStore for token storage
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
     // Jetpack Compose
     implementation(libs.androidx.ui.v180)
     implementation(libs.androidx.material)

@@ -66,9 +66,15 @@ abstract class DataModule { // object -> abstract class
     }
 
     // AuthRepository 바인딩 (Binds 사용)
+    // 구글 로그인 구현체 (현재는 사용하지 않음)
+    // @Binds
+    // @Singleton
+    // abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    // JWT 인증 구현체
     @Binds
     @Singleton
-    abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+    abstract fun bindAuthRepository(impl: AuthRepositoryGoogleImpl): AuthRepository
 
     // UserRepository 바인딩 (Binds 사용)
     @Binds
