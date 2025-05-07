@@ -5,7 +5,7 @@ FROM openjdk:17-jdk-slim
 COPY build/libs/*.jar app.jar
 
 # 3. 컨테이너 포트 노출
-EXPOSE 8080
+EXPOSE 8050
 
 # 4. 실행 커맨드
 ENTRYPOINT ["java", "-jar", "/app.jar"]
