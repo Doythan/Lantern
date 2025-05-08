@@ -11,10 +11,10 @@ ksp {
 }
 
 android {
-    namespace = "com.ssafy.lantern"
+    namespace = "com.ssafy.lanterns"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.ssafy.lantern"
+        applicationId = "com.ssafy.lanterns"
         minSdk = 33
         targetSdk = 34
         versionCode = 1
@@ -86,6 +86,15 @@ dependencies {
     testImplementation(libs.androidx.room.testing)
     implementation(libs.androidx.room.paging)
 
+    // Retrofit & OkHttp for network calls
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    
+    // DataStore for token storage
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
     // Jetpack Compose
     implementation(libs.androidx.ui.v180)
     implementation(libs.androidx.material)
@@ -95,14 +104,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-    // Google Sign-In (기존 play-services-auth 버전이 있다면 최신 버전으로 업데이트 고려)
-    implementation("com.google.android.gms:play-services-auth:21.1.0") // 최신 안정 버전 확인
-    implementation("com.google.firebase:firebase-auth:22.2.0")
-    implementation("com.google.android.gms:play-services-auth:20.7.0")
-
-    // Credential Manager (이제 직접 사용하지 않지만, 다른 곳에서 필요할 수 있으므로 일단 유지)
-    // implementation("androidx.credentials:credentials:1.3.0-alpha01")
-    // implementation("androidx.credentials:credentials-play-services-auth:1.3.0-alpha01")
+    // Google Sign-In - Firebase 의존성 제거
+    implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경
 
     // Hilt (버전은 프로젝트 상황에 맞게 조정)
     implementation("com.google.dagger:hilt-android:2.51.1")
