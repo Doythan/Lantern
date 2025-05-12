@@ -42,6 +42,41 @@ abstract class DataModule { // object -> abstract class
         fun provideUserDao(appDatabase: AppDatabase): UserDao {
             return appDatabase.userDao()
         }
+        
+        @Provides
+        @Singleton
+        fun provideChatRoomDao(appDatabase: AppDatabase): ChatRoomDao {
+            return appDatabase.chatRoomDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideMessagesDao(appDatabase: AppDatabase): MessagesDao {
+            return appDatabase.messagesDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideFollowDao(appDatabase: AppDatabase): FollowDao {
+            return appDatabase.followDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideCallListDao(appDatabase: AppDatabase): CallListDao {
+            return appDatabase.callListDao()
+        }
+
+        // UserRepository 제공 메서드 추가
+        @Provides
+        @Singleton
+        fun provideUserRepositoryImpl(
+            userDao: UserDao,
+            chatRoomDao: ChatRoomDao,
+            messagesDao: MessagesDao
+        ): UserRepositoryImpl {
+            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao)
+        }
 
         // AdvertiserManager, GattServerManager, GattClientManager @Provides도 여기로 이동
         @Provides

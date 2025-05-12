@@ -5,26 +5,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.ContentAlpha
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import androidx.compose.ui.unit.sp
+import com.ssafy.lanterns.ui.theme.*
 import com.ssafy.lanterns.ui.util.getProfileImageResId
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 
 // 통화 중 화면
 @Composable
@@ -52,52 +54,72 @@ fun OngoingCallScreen(
         "${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
     }
     
+    // 시스템 바 패딩 계산
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+    val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues()
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colors.background)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(NavyTop, NavyBottom)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(
+                    top = statusBarPadding.calculateTopPadding(),
+                    bottom = navigationBarPadding.calculateBottomPadding()
+                )
+                .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // 상단 정보
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 32.dp)
+                modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(
                     text = callerName,
-                    color = MaterialTheme.colors.onBackground,
-                    style = MaterialTheme.typography.h5.copy(fontWeight = FontWeight.Bold)
+                    color = TextWhite,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
                     text = formattedDuration,
-                    color = MaterialTheme.colors.onBackground.copy(alpha = ContentAlpha.medium),
-                    style = MaterialTheme.typography.body1
+                    color = TextWhite70,
+                    fontSize = 18.sp
                 )
             }
             
             // 중앙 프로필
-            Image(
-                painter = painterResource(id = getProfileImageResId(callerId)),
-                contentDescription = "Caller Profile",
+            Box(
                 modifier = Modifier
                     .size(200.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colors.surface)
-            )
+                    .background(DarkCardBackground),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = getProfileImageResId(callerId)),
+                    contentDescription = "Caller Profile",
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clip(CircleShape)
+                )
+            }
             
-            // 하단 통화 컨트롤
+            // 하단 통화 컨트롤 (네비게이션 바 고려)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = 16.dp)
             ) {
                 // 통화 기능 버튼들
                 Row(
@@ -106,10 +128,10 @@ fun OngoingCallScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val inactiveButtonColor = MaterialTheme.colors.onSurface.copy(alpha = 0.12f)
-                    val activeButtonColor = MaterialTheme.colors.primary
-                    val inactiveIconColor = MaterialTheme.colors.onSurface
-                    val activeIconColor = MaterialTheme.colors.onPrimary
+                    val inactiveButtonColor = DarkCardBackground
+                    val activeButtonColor = Primary
+                    val inactiveIconColor = TextWhite70
+                    val activeIconColor = TextWhite
 
                     // 스피커 버튼
                     Column(
@@ -142,8 +164,8 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "스피커",
-                            color = MaterialTheme.colors.onBackground,
-                            style = MaterialTheme.typography.caption
+                            color = TextWhite,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                     
@@ -178,27 +200,28 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "음소거",
-                            color = MaterialTheme.colors.onBackground,
-                            style = MaterialTheme.typography.caption
+                            color = TextWhite,
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 // 통화 종료 버튼
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colors.error)
-                        .clickable(onClick = onEndCallClick),
-                    contentAlignment = Alignment.Center
+                Button(
+                    onClick = onEndCallClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Error
+                    ),
+                    shape = CircleShape,
+                    modifier = Modifier.size(64.dp),
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CallEnd,
                         contentDescription = "End Call",
-                        tint = MaterialTheme.colors.onError,
+                        tint = TextWhite,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -213,11 +236,11 @@ fun OngoingCallScreenPreview() {
     LanternTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colors.background
+            color = DarkBackground
         ) {
             OngoingCallScreen(
-                callerName = "도경원",
-                callerId = 1,
+                callerName = "김민수",
+                callerId = 2,
                 onEndCallClick = {}
             )
         }

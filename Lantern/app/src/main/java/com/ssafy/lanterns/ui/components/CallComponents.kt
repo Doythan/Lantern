@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.CallMade
 import androidx.compose.material.icons.filled.CallMissed
 import androidx.compose.material.icons.filled.CallReceived
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +29,10 @@ fun FriendCallItem(friend: FriendCallItem) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(profileId = friend.id)
+        ProfileAvatar(
+            profileId = friend.id, 
+            modifier = Modifier
+        )
         
         Spacer(modifier = Modifier.width(12.dp))
         
@@ -147,7 +151,7 @@ fun SimpleProfileField(
         }
         
         // Divider
-        Divider(
+        HorizontalDivider(
             modifier = Modifier.padding(top = 4.dp),
             color = if (isEditing) MaterialTheme.colors.primary else MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
             thickness = 1.dp
