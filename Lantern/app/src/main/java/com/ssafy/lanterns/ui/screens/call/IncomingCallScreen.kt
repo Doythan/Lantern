@@ -4,21 +4,26 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import androidx.compose.ui.unit.sp
+import com.ssafy.lanterns.ui.theme.*
 import com.ssafy.lanterns.ui.util.getProfileImageResId
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 
 /**
  * 전화 수신 화면
@@ -30,98 +35,138 @@ fun IncomingCallScreen(
     onRejectClick: () -> Unit,
     onAcceptClick: () -> Unit
 ) {
-    Column(
+    // 시스템 바 패딩 계산
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
+    val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues()
+    
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colors.background)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(NavyTop, NavyBottom)
+                )
+            )
     ) {
-        Spacer(modifier = Modifier.height(64.dp))
-        
-        Image(
-            painter = painterResource(id = getProfileImageResId(callerId)),
-            contentDescription = "Caller Profile",
+        Column(
             modifier = Modifier
-                .size(200.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colors.surface)
-        )
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        Text(
-            text = callerName,
-            color = MaterialTheme.colors.onBackground,
-            style = MaterialTheme.typography.h4.copy(fontWeight = FontWeight.Bold)
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .fillMaxSize()
+                .padding(
+                    top = statusBarPadding.calculateTopPadding(),
+                    bottom = navigationBarPadding.calculateBottomPadding()
+                )
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // 상단 영역
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(top = 24.dp)
             ) {
-                Button(
-                    onClick = onRejectClick,
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.error
-                    ),
-                    shape = CircleShape,
-                    modifier = Modifier.size(64.dp),
-                    contentPadding = PaddingValues(0.dp)
+                // 프로필 이미지
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .clip(CircleShape)
+                        .background(DarkCardBackground),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.CallEnd,
-                        contentDescription = "Reject Call",
-                        tint = MaterialTheme.colors.onError,
-                        modifier = Modifier.size(32.dp)
+                    Image(
+                        painter = painterResource(id = getProfileImageResId(callerId)),
+                        contentDescription = "Caller Profile",
+                        modifier = Modifier
+                            .size(180.dp)
+                            .clip(CircleShape)
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
+                // 발신자 이름
                 Text(
-                    text = "거절",
-                    color = MaterialTheme.colors.onBackground,
-                    style = MaterialTheme.typography.button
+                    text = callerName,
+                    color = TextWhite,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // "전화가 왔습니다" 텍스트
+                Text(
+                    text = "전화가 왔습니다",
+                    color = TextWhite70,
+                    fontSize = 18.sp
                 )
             }
             
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+            // 하단 버튼 영역 (내비게이션 바 고려)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Button(
-                    onClick = onAcceptClick,
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color(0xFF4CAF50)
-                    ),
-                    shape = CircleShape,
-                    modifier = Modifier.size(64.dp),
-                    contentPadding = PaddingValues(0.dp)
+                // 거절 버튼
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Call,
-                        contentDescription = "Accept Call",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                    Button(
+                        onClick = onRejectClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Error
+                        ),
+                        shape = CircleShape,
+                        modifier = Modifier.size(64.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CallEnd,
+                            contentDescription = "거절",
+                            tint = TextWhite,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "거절",
+                        color = TextWhite,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Text(
-                    text = "수락",
-                    color = MaterialTheme.colors.onBackground,
-                    style = MaterialTheme.typography.button
-                )
+                // 수락 버튼
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        onClick = onAcceptClick,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Primary
+                        ),
+                        shape = CircleShape,
+                        modifier = Modifier.size(64.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Call,
+                            contentDescription = "수락",
+                            tint = TextWhite,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        text = "수락",
+                        color = TextWhite,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
         }
     }
@@ -133,11 +178,11 @@ fun IncomingCallScreenPreview() {
     LanternTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colors.background
+            color = DarkBackground
         ) {
             IncomingCallScreen(
-                callerName = "도경원",
-                callerId = 1,
+                callerName = "김민수",
+                callerId = 2,
                 onRejectClick = {},
                 onAcceptClick = {}
             )

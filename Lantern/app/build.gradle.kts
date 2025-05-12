@@ -15,7 +15,7 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "com.ssafy.lanterns"
-        minSdk = 33
+        minSdk = 31
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -71,7 +71,10 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
+    
+    // 구글 Material Design 라이브러리는 필요 시 사용 (AppCompat 의존성으로 필요할 수 있음)
     implementation(libs.material)
+    
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
@@ -95,14 +98,30 @@ dependencies {
     // DataStore for token storage
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
-    // Jetpack Compose
+    // Jetpack Compose UI Components
     implementation(libs.androidx.ui.v180)
-    implementation(libs.androidx.material)
     implementation(libs.androidx.ui.tooling.preview.v180)
     implementation(libs.androidx.activity.compose.v170)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    
+    // Compose Material 관련 의존성
     implementation(libs.androidx.compose.material.icons)
+    implementation("androidx.compose.material:material:1.6.5") // Material 2 - 기존 코드와의 호환성
+    implementation("androidx.compose.material3:material3:1.2.1") // Material 3 - 새로운 UI
+    implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
+    
+    // Compose Animation - 명시적으로 추가
+    implementation("androidx.compose.animation:animation:1.6.5")
+    implementation("androidx.compose.animation:animation-core:1.6.5")
+    
+    // Compose Material Icons Extended - 추가 아이콘 세트
+    implementation("androidx.compose.material:material-icons-extended:1.6.5")
+    
+    // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Google Sign-In - Firebase 의존성 제거
     implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경

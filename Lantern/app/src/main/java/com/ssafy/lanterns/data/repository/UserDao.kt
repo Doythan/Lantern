@@ -29,4 +29,8 @@ interface UserDao {
     // 모든 사용자 정보 삭제
     @Query("DELETE FROM `user`")
     suspend fun deleteAllUsers()
+
+    // 특정 ID의 사용자 정보 조회
+    @Query("SELECT * FROM `user` WHERE user_id = :userId LIMIT 1")
+    suspend fun getUserById(userId: Long): User?
 }

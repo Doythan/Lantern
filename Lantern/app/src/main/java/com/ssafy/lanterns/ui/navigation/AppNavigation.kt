@@ -11,11 +11,15 @@ import com.ssafy.lanterns.ui.common.MainScaffold // MainScaffold 임포트
 import com.ssafy.lanterns.ui.screens.call.FriendListScreen
 import com.ssafy.lanterns.ui.screens.call.IncomingCallScreen
 import com.ssafy.lanterns.ui.screens.call.OngoingCallScreen
-import com.ssafy.lanterns.ui.screens.chat.ChatScreen // ChatScreen 임포트
-import com.ssafy.lanterns.ui.screens.chat.ChatListScreen // ChatListScreen 임포트
+import com.ssafy.lanterns.ui.screens.call.OutgoingCallScreen
+// import com.ssafy.lanterns.ui.screens.chat.ChatScreen // 삭제된 파일 임포트 제거
+import com.ssafy.lanterns.ui.screens.chat.ChatListScreen
 import com.ssafy.lanterns.ui.screens.chat.DirectChatScreen
 import com.ssafy.lanterns.ui.screens.chat.PublicChatScreen
+import com.ssafy.lanterns.ui.screens.common.ProfileScreen // 프로필 화면 임포트
+import com.ssafy.lanterns.ui.screens.common.UserProfileData // 프로필 데이터 클래스 임포트
 import com.ssafy.lanterns.ui.screens.login.LoginScreen
+import com.ssafy.lanterns.ui.screens.main.MainScreen
 import com.ssafy.lanterns.ui.screens.mypage.MyPageScreen
 import com.ssafy.lanterns.ui.screens.signup.SignupScreen
 
@@ -23,17 +27,26 @@ import com.ssafy.lanterns.ui.screens.signup.SignupScreen
 object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val SIGNUP_ROUTE = "signup"
-    const val CHAT_ROUTE = "chat" // 채팅 상세 화면 라우트
+    // const val CHAT_ROUTE = "chat" // 삭제된 화면에 대한 라우트 제거
     const val MYPAGE_ROUTE = "mypage"
     const val FRIENDLIST_ROUTE = "friendlist" // 통화 목록 (하단 탭)
     const val INCOMING_CALL_ROUTE = "incomingcall"
     const val ONGOING_CALL_ROUTE = "ongoingcall"
+    const val OUTGOING_CALL_ROUTE = "outgoingcall/{receiverId}" // 통화 거는 중 화면 (receiverId 파라미터 포함)
+    const val OUTGOING_CALL_ARG_RECEIVER_ID = "receiverId"
     const val HOME_ROUTE = "home" // 채팅 목록 (하단 탭) - 기존 메인 역할
+    const val MAIN_SCREEN_ROUTE = "main_screen" // 새로운 메인 화면
 
     // 새로운 채팅 라우트
     const val PUBLIC_CHAT_ROUTE = "public_chat"
     const val DIRECT_CHAT_ROUTE = "direct_chat/{userId}" // 사용자 ID 파라미터 포함
     const val DIRECT_CHAT_ARG_USER_ID = "userId"
+
+    // 프로필 화면 라우트
+    const val PROFILE_ROUTE = "profile/{userId}/{name}/{distance}"
+    const val PROFILE_ARG_USER_ID = "userId"
+    const val PROFILE_ARG_NAME = "name"
+    const val PROFILE_ARG_DISTANCE = "distance"
 
     // 다른 라우트 추가 가능
 }
@@ -58,8 +71,8 @@ fun AppNavigation() {
                 onIncomingCallClick = { navController.navigate(AppDestinations.INCOMING_CALL_ROUTE) }, // 테스트용?
                 onHomeClick = { navController.navigate(AppDestinations.HOME_ROUTE) }, // 주석 해제
                 onLoginSuccess = {
-                    // 로그인 성공 시 HOME_ROUTE (채팅 목록)으로 이동하고 로그인 화면은 백스택에서 제거
-                    navController.navigate(AppDestinations.HOME_ROUTE) {
+                    // 로그인 성공 시 MAIN_SCREEN_ROUTE로 이동하고 로그인 화면은 백스택에서 제거
+                    navController.navigate(AppDestinations.MAIN_SCREEN_ROUTE) {
                         popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true }
                     }
                 }
@@ -72,14 +85,21 @@ fun AppNavigation() {
                 onBackToLoginClick = { navController.popBackStack() }
             )
         }
-
-        // 채팅 상세 화면 (개별 채팅방) - 하단 네비게이션 없음
-        composable(AppDestinations.CHAT_ROUTE) {
-            // ChatScreen은 MainScaffold 밖에 있어야 하단 네비게이션이 보이지 않음
-            ChatScreen(
-                // 필요 시 navController, chatId 등 전달
-            )
+        
+        // 새로운 메인 화면 (네비게이션 바 포함)
+        composable(AppDestinations.MAIN_SCREEN_ROUTE) {
+            MainScaffold(navController = navController) { paddingValues ->
+                MainScreen(paddingValues = paddingValues)
+            }
         }
+
+        // 채팅 상세 화면 (개별 채팅방) 라우트 제거 - 이제 사용하지 않음
+        // composable(AppDestinations.CHAT_ROUTE) {
+        //     // ChatScreen은 MainScaffold 밖에 있어야 하단 네비게이션이 보이지 않음
+        //     ChatScreen(
+        //         // 필요 시 navController, chatId 등 전달
+        //     )
+        // }
 
         // --- 하단 네비게이션 바가 있는 화면들 ---
 
@@ -138,16 +158,33 @@ fun AppNavigation() {
              )
         }
 
+        // 통화 거는 중 화면
+        composable(
+            route = AppDestinations.OUTGOING_CALL_ROUTE,
+            arguments = listOf(navArgument(AppDestinations.OUTGOING_CALL_ARG_RECEIVER_ID) { type = NavType.StringType })
+        ) { backStackEntry ->
+            val receiverId = backStackEntry.arguments?.getString(AppDestinations.OUTGOING_CALL_ARG_RECEIVER_ID)
+            if (receiverId != null) {
+                OutgoingCallScreen(
+                    receiverName = "수신자", // 실제 데이터로 대체 필요
+                    receiverId = receiverId.toIntOrNull() ?: 1,
+                    onCancelClick = {
+                        navController.popBackStack() // 통화 취소 시 이전 화면으로
+                    }
+                )
+            } else {
+                Text("Error: Receiver ID not found.")
+            }
+        }
+
         // 통화 중 화면
         composable(AppDestinations.ONGOING_CALL_ROUTE) {
             OngoingCallScreen(
                  callerName = "임시 발신자", // 실제 데이터 전달 필요
                  onEndCallClick = {
-                     // 통화 종료 후 HOME (채팅 목록)으로 이동 (백스택 관리 필요 시 조정)
-                     // 예: 통화 시작 전 화면으로 돌아가려면 popBackStack() 사용
-                     navController.navigate(AppDestinations.HOME_ROUTE){
-                         // 필요에 따라 popUpTo 등을 사용하여 백스택 정리
-                         popUpTo(AppDestinations.LOGIN_ROUTE) // 로그인 이후의 모든 화면 제거 (예시)
+                     // 통화 종료 후 MAIN_SCREEN_ROUTE로 이동
+                     navController.navigate(AppDestinations.MAIN_SCREEN_ROUTE){
+                         popUpTo(AppDestinations.LOGIN_ROUTE) // 로그인 이후의 모든 화면 제거
                      }
                  }
              )
@@ -156,8 +193,7 @@ fun AppNavigation() {
         // 공용 채팅 화면
         composable(AppDestinations.PUBLIC_CHAT_ROUTE) {
             PublicChatScreen(
-                // 필요 시 NavController 전달
-                 navController = navController // NavController 전달
+                navController = navController // NavController 전달
             )
         }
 
@@ -175,6 +211,29 @@ fun AppNavigation() {
             } else {
                 Text("Error: User ID not found.")
             }
+        }
+
+        // 프로필 화면
+        composable(
+            route = AppDestinations.PROFILE_ROUTE,
+            arguments = listOf(
+                navArgument(AppDestinations.PROFILE_ARG_USER_ID) { type = NavType.StringType },
+                navArgument(AppDestinations.PROFILE_ARG_NAME) { type = NavType.StringType },
+                navArgument(AppDestinations.PROFILE_ARG_DISTANCE) { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_USER_ID) ?: ""
+            val name = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_NAME) ?: ""
+            val distance = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_DISTANCE) ?: ""
+            
+            ProfileScreen(
+                navController = navController,
+                userData = UserProfileData(
+                    userId = userId,
+                    name = name,
+                    distance = distance
+                )
+            )
         }
 
         // 다른 화면들에 대한 composable 추가 가능

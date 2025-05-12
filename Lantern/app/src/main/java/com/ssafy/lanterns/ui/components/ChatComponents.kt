@@ -33,7 +33,11 @@ fun ChatMessageBubble(
     ) {
         // 상대방 프로필 이미지 (내가 보낸 메시지가 아니고, 프로필 ID가 있을 때)
         if (!isMe && senderProfileId != null) {
-            ProfileAvatar(profileId = senderProfileId, size = 36.dp)
+            ProfileAvatar(
+                profileId = senderProfileId, 
+                size = 36.dp,
+                modifier = Modifier
+            )
             Spacer(modifier = Modifier.width(8.dp))
         }
 
@@ -81,7 +85,11 @@ fun ChatMessageBubble(
         /*
         if (isMe && senderProfileId != null) {
             Spacer(modifier = Modifier.width(8.dp))
-            ProfileAvatar(profileId = senderProfileId, size = 36.dp)
+            ProfileAvatar(
+                profileId = senderProfileId, 
+                size = 36.dp,
+                modifier = Modifier
+            )
         }
          */
     }

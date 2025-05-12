@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
@@ -15,12 +16,18 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.ssafy.lanterns.ui.theme.BleBlue1
 import com.ssafy.lanterns.ui.util.getProfileImageResId
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.layout.Column
+import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.ConnectionNear
 
 /**
  * 앱 전체에서 사용될 수 있는 공통 검색 바
@@ -57,25 +64,87 @@ fun CommonSearchBar(
 
 /**
  * 공통 프로필 아바타 컴포넌트
+ * 
+ * @param profileId 프로필 이미지 ID (getProfileImageResId 함수와 함께 사용)
+ * @param size 아바타 크기 (기본 48dp)
+ * @param modifier 추가 모디파이어 
+ * @param borderColor 경계선 색상 (hasBorder가 true일 때 사용)
+ * @param hasBorder 경계선 표시 여부
+ * @param onClick 클릭 이벤트 처리 (선택 사항)
  */
 @Composable
 fun ProfileAvatar(
-    profileId: Int, // 프로필 이미지 ID (getProfileImageResId 와 함께 사용)
-    size: Dp = 48.dp, // 기본 크기
+    profileId: Int,
+    size: Dp = 48.dp,
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null // 클릭 이벤트 처리 (선택 사항)
+    borderColor: Color = Color.Transparent,
+    hasBorder: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
-    Image(
-        painter = painterResource(id = getProfileImageResId(profileId)),
-        contentDescription = "Profile Avatar",
-        modifier = modifier
-            .size(size)
-            .clip(CircleShape)
-            // 배경색은 이미지 자체에 포함되어 있거나 투명할 경우를 대비하여 설정
-            .background(MaterialTheme.colors.surface)
-            .then(
-                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
-            ),
-        contentScale = ContentScale.Crop // 이미지가 원 안에 꽉 차도록
-    )
+    if (hasBorder) {
+        // 경계선이 있는 프로필 아바타
+        androidx.compose.foundation.layout.Box(
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            borderColor,
+                            BleBlue1
+                        )
+                    )
+                )
+                .padding(2.dp)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        ) {
+            Image(
+                painter = painterResource(id = getProfileImageResId(profileId)),
+                contentDescription = "Profile Avatar",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+        }
+    } else {
+        // 경계선이 없는 기본 프로필 아바타
+        Image(
+            painter = painterResource(id = getProfileImageResId(profileId)),
+            contentDescription = "Profile Avatar",
+            modifier = modifier
+                .size(size)
+                .clip(CircleShape)
+                .background(MaterialTheme.colors.surface)
+                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Preview
+@Composable
+fun ProfileAvatarPreview() {
+    LanternTheme {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .background(Color(0xFF051225))
+        ) {
+            // 기본 프로필 아바타
+            ProfileAvatar(
+                profileId = 1,
+                size = 48.dp
+            )
+            
+            // 경계선이 있는 프로필 아바타
+            ProfileAvatar(
+                profileId = 2,
+                size = 48.dp,
+                borderColor = ConnectionNear,
+                hasBorder = true,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+        }
+    }
 } 

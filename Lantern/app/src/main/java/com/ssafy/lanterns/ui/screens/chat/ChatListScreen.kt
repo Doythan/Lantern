@@ -9,12 +9,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -22,12 +29,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.lanterns.R
 import com.ssafy.lanterns.ui.components.ProfileAvatar
-import com.ssafy.lanterns.ui.theme.LanternTheme
-import androidx.navigation.NavController
 import com.ssafy.lanterns.ui.navigation.AppDestinations
-import androidx.compose.ui.platform.LocalContext
+import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.NavyTop
+import com.ssafy.lanterns.ui.theme.NavyBottom
+import com.ssafy.lanterns.ui.theme.TextWhite
+import com.ssafy.lanterns.ui.theme.TextWhite70
+import com.ssafy.lanterns.ui.theme.BleBlue1
+import com.ssafy.lanterns.ui.theme.BleBlue2
+import com.ssafy.lanterns.ui.theme.ConnectionNear
+import com.ssafy.lanterns.ui.theme.ConnectionMedium
+import com.ssafy.lanterns.ui.theme.ConnectionFar
+import com.ssafy.lanterns.utils.getConnectionColorByDistance
 
 // Data model for Chat List item
 data class ChatItem(
@@ -35,12 +53,15 @@ data class ChatItem(
     val name: String,
     val lastMessage: String,
     val time: String,
-    val unread: Boolean = false
+    val unread: Boolean = false,
+    val distance: Float = 0f // 거리 정보 재추가 (미터 단위)
 )
 
 // Data model for Nearby section item (simplified)
 data class NearbyUser(
-    val id: Int // Use ID to fetch profile image
+    val id: Int, // 프로필 이미지용 ID
+    val name: String = "사용자 $id",
+    val distance: Float = 0f // 거리 정보 재추가 (미터 단위)
 )
 
 // Removed the local getProfileImageResId function, it's now in ImageUtils.kt
@@ -48,100 +69,162 @@ data class NearbyUser(
 @Composable
 fun ChatListScreen(
     paddingValues: PaddingValues = PaddingValues(),
-    navController: NavController
+    navController: NavController,
+    viewModel: ChatListViewModel = hiltViewModel()
 ) {
-    // Dummy data
-    val nearbyUsers = remember { List(8) { NearbyUser(id = it + 1) } } // 8 nearby users
-    val chatList = remember {
-        listOf(
-            ChatItem(1, "내가진짜도경원", "와, 와이파이 없이 대화 신기하당 ㅎㅎ", "11:20 am", true),
-            ChatItem(2, "귀요미", "난 귀요미", "10:20 am"),
-            ChatItem(3, "백성욱", "메시지 입력해봐..", "어제"),
-            ChatItem(4, "박수민", "나만의 채로서 일타강사.", "어제"),
-            ChatItem(5, "천세욱1", "여긴 어디? 난 누구?", "어제"),
-            ChatItem(6, "천세욱2", "여긴 어디? 난 누구?", "어제")
-        )
-    }
-
-    Column(
+    // ViewModel에서 UI 상태 가져오기
+    val uiState by viewModel.uiState.collectAsState()
+    
+    // UI 컴포넌트 렌더링
+    Surface(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colors.background)
-            .padding(paddingValues) // Apply padding from Scaffold
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(NavyTop, NavyBottom)
+                )
+            )
     ) {
-        // Search Bar (Removed as per user's last change, keep it removed)
-
-        // Nearby Section
-        NearbySection(nearbyUsers = nearbyUsers)
-
-        Spacer(modifier = Modifier.height(24.dp)) // Increased space between Nearby and Chat sections
-
-        // Chat Section Label
-        Text(
-            text = "채팅",
-            color = MaterialTheme.colors.onBackground,
-            style = MaterialTheme.typography.h6.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.padding(start = 16.dp, bottom = 16.dp) // Style matches "주변"
-        )
-
-        // Chat List (including Public Chat at the top)
-        LazyColumn(
-            modifier = Modifier.weight(1f) // Takes remaining space
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(NavyTop, NavyBottom)
+                    )
+                )
+                .padding(paddingValues) // Apply padding from Scaffold
         ) {
-            // Public Chat Item - Always at the top
-            item {
-                PublicChatListItem(navController = navController)
-                Divider(
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
-                    thickness = 1.dp,
-                    // Indent divider like other items, starting after the icon area
-                    modifier = Modifier.padding(start = 76.dp, end = 16.dp)
-                )
-            }
+            // Nearby Section
+            NearbySection(nearbyUsers = uiState.nearbyUsers, navController = navController)
 
-            // Private Chat List Items
-            items(chatList) { chat ->
-                ChatListItem(chat = chat, navController = navController)
-                Divider(
-                    color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(start = 76.dp, end = 16.dp) // Indent divider
-                )
+            Spacer(modifier = Modifier.height(24.dp)) // Increased space between Nearby and Chat sections
+
+            // Chat Section Label
+            Text(
+                text = "채팅",
+                color = TextWhite,
+                style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.padding(start = 16.dp, bottom = 16.dp) // Style matches "주변"
+            )
+
+            // Chat List (including Public Chat at the top)
+            LazyColumn(
+                modifier = Modifier.weight(1f) // Takes remaining space
+            ) {
+                // Public Chat Item - Always at the top
+                item {
+                    PublicChatListItem(navController = navController)
+                    HorizontalDivider(
+                        color = TextWhite.copy(alpha = 0.12f),
+                        thickness = 1.dp,
+                        // Indent divider like other items, starting after the icon area
+                        modifier = Modifier.padding(start = 76.dp, end = 16.dp)
+                    )
+                }
+
+                // Private Chat List Items
+                items(uiState.chatList) { chat ->
+                    ChatListItem(chat = chat, navController = navController)
+                    HorizontalDivider(
+                        color = TextWhite.copy(alpha = 0.12f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(start = 76.dp, end = 16.dp) // Indent divider
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun NearbySection(nearbyUsers: List<NearbyUser>) {
-    Column(modifier = Modifier.padding(top = 16.dp)) { // Keep top padding for space after potential search bar
-        Text(
-            text = "주변",
-            color = MaterialTheme.colors.onBackground,
-            style = MaterialTheme.typography.h6.copy(fontWeight = FontWeight.Bold),
-            modifier = Modifier.padding(start = 16.dp, bottom = 16.dp)
-        )
+fun NearbySection(nearbyUsers: List<NearbyUser>, navController: NavController) {
+    // Section Text
+    Text(
+        text = "주변",
+        color = TextWhite,
+        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
+        modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
+    )
+    
+    // Horizontal scrolling row for nearby users
+    if (nearbyUsers.isNotEmpty()) {
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(nearbyUsers) { user ->
-                NearbyUserAvatar(user = user)
+                NearbyUserItem(user = user, navController = navController)
             }
+        }
+    } else {
+        // 주변 사용자가 없는 경우
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "주변에 사용자가 없습니다",
+                color = TextWhite70,
+                style = MaterialTheme.typography.bodyLarge
+            )
         }
     }
 }
 
 @Composable
-fun NearbyUserAvatar(user: NearbyUser) {
-    ProfileAvatar(
-        profileId = user.id,
-        size = 64.dp, // Nearby 섹션은 더 큰 아바타 사용
-        onClick = { /* TODO: Handle click on nearby user */ }
-    )
+fun NearbyUserItem(user: NearbyUser, navController: NavController) {
+    val connectionColor = getConnectionColorByDistance(user.distance)
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(72.dp)
+    ) {
+        // Profile Image with Connection Status
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable {
+                    // 프로필 화면으로 이동
+                    val route = AppDestinations.PROFILE_ROUTE
+                        .replace("{userId}", user.id.toString())
+                        .replace("{name}", user.name)
+                        .replace("{distance}", "${user.distance.toInt()}m")
+                    navController.navigate(route)
+                }
+        ) {
+            ProfileAvatar(
+                profileId = user.id,
+                borderColor = connectionColor,
+                hasBorder = true,
+                size = 64.dp
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Name
+        Text(
+            text = user.name,
+            color = TextWhite,
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium
+        )
+        
+        // Distance
+        Text(
+            text = "${user.distance.toInt()}m",
+            color = connectionColor,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
 }
 
-// New Composable for the Public Chat list item
 @Composable
 fun PublicChatListItem(navController: NavController) {
     Row(
@@ -156,7 +239,11 @@ fun PublicChatListItem(navController: NavController) {
             modifier = Modifier
                 .size(48.dp) // Same size as profile images
                 .clip(CircleShape)
-                .background(Color.White), // White background
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(BleBlue1, BleBlue2)
+                    )
+                ),
             contentAlignment = Alignment.Center // Center the image inside
         ) {
             // Image for Public Chat (Megaphone)
@@ -166,157 +253,171 @@ fun PublicChatListItem(navController: NavController) {
                 // Adjust size or padding as needed for the megaphone image within the circle
                 modifier = Modifier
                     .size(32.dp) // Make image smaller than the 48dp circle
-                    // .padding(8.dp) // Alternative: Add padding around the image
             )
         }
 
         Spacer(modifier = Modifier.width(12.dp))
-
-        // Public Chat Title and Description
+        
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "공용 채팅",
-                color = MaterialTheme.colors.onSurface,
-                style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold),
-                fontSize = 16.sp
+                text = "공개 대화방",
+                color = TextWhite,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
             Text(
-                text = "주변 사용자들과 대화해보세요!", // Example description
-                color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
-                style = MaterialTheme.typography.body2,
+                text = "주변의 모든 사람들과 대화해보세요",
+                color = TextWhite70,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        // No timestamp or unread indicator needed for the public chat item
     }
 }
 
-
-// ChatListItem Composable remains the same
 @Composable
 fun ChatListItem(chat: ChatItem, navController: NavController) {
+    val connectionColor = getConnectionColorByDistance(chat.distance)
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                // userId 파라미터에 chat.id 를 문자열로 변환하여 전달 (라우트 정의에 맞게)
-                navController.navigate("${AppDestinations.DIRECT_CHAT_ROUTE.substringBefore('{')}${chat.id}")
+            .clickable { 
+                // 1대1 채팅방으로 이동
+                val route = AppDestinations.DIRECT_CHAT_ROUTE.replace("{userId}", chat.id.toString())
+                
+                // 디버깅 메시지
+                println("Navigating to chat with user ID: ${chat.id}, route: $route")
+                
+                navController.navigate(route)
             }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ProfileAvatar(profileId = chat.id) // ProfileAvatar 사용
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = chat.name,
-                color = MaterialTheme.colors.onSurface,
-                style = MaterialTheme.typography.subtitle1.copy(fontWeight = FontWeight.Bold),
-                fontSize = 16.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = chat.lastMessage,
-                color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
-                style = MaterialTheme.typography.body2,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Column(horizontalAlignment = Alignment.End) {
-            Text(
-                text = chat.time,
-                color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
-                style = MaterialTheme.typography.caption,
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Box(
-                modifier = Modifier
-                    .height(8.dp)
-                    .width(8.dp)
-            ) {
-                if (chat.unread) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(Color(0xFFFFC107), CircleShape)
-                    )
+        // Profile Avatar with clickable to open profile screen
+        Box(
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable {
+                    // 클릭 이벤트가 상위 Row에 전파되지 않도록 stopPropagation 처리
+                    // 프로필 화면으로 이동
+                    val route = AppDestinations.PROFILE_ROUTE
+                        .replace("{userId}", chat.id.toString())
+                        .replace("{name}", chat.name)
+                        .replace("{distance}", "${chat.distance.toInt()}m")
+                    navController.navigate(route)
                 }
+        ) {
+            ProfileAvatar(
+                profileId = chat.id,
+                size = 48.dp,
+                hasBorder = true,
+                borderColor = connectionColor
+            )
+        }
+        
+        Spacer(modifier = Modifier.width(12.dp))
+        
+        // 채팅 정보
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            // 이름과 시간
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = chat.name,
+                    color = TextWhite,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                Text(
+                    text = chat.time,
+                    color = TextWhite70,
+                    fontSize = 12.sp
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            // 마지막 메시지와 거리
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = chat.lastMessage,
+                    color = TextWhite70,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // 거리 표시
+                Text(
+                    text = "${chat.distance.toInt()}m",
+                    color = connectionColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
 }
 
-
-// --- Previews ---
-
-@Preview(showBackground = true, backgroundColor = 0xFF181818)
+@Preview(showBackground = true)
 @Composable
-fun ChatListScreenPreview() {
+fun ChatListItemPreview() {
     LanternTheme {
-        // Preview에서는 NavController를 직접 생성하거나 가짜(mock) 객체를 전달해야 할 수 있음
-        // 여기서는 일단 기본 화면만 표시되도록 navController 없이 호출 (실제 앱에서는 NavHost가 관리)
-        // ChatListScreen() // navController 없으면 오류 발생
-        // 임시로 가짜 NavController 사용 (실제 동작 없음)
-        val dummyNavController = NavController(LocalContext.current)
-        ChatListScreen(navController = dummyNavController)
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF181818)
-@Composable
-fun NearbySectionPreview() {
-    LanternTheme {
-        NearbySection(nearbyUsers = List(5) { NearbyUser(id = it + 1) })
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF181818)
-@Composable
-fun PublicChatListItemPreview() {
-    LanternTheme {
-        Surface(color = MaterialTheme.colors.background) {
-             Column {
-                // PublicChatListItem() // navController 없으면 오류 발생
-                val dummyNavController = NavController(LocalContext.current)
-                PublicChatListItem(navController = dummyNavController)
-                Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f), thickness = 1.dp, modifier = Modifier.padding(start = 76.dp, end = 16.dp))
-            }
+        Surface(
+            color = NavyTop
+        ) {
+            val dummyNavController = NavController(LocalContext.current)
+            ChatListItem(
+                chat = ChatItem(
+                    id = 1,
+                    name = "도경원",
+                    lastMessage = "안녕하세요, 반갑습니다!",
+                    time = "오전 10:30",
+                    unread = true,
+                    distance = 50f
+                ),
+                navController = dummyNavController
+            )
         }
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF181818)
+@Preview(showBackground = true)
 @Composable
-fun ChatListItemPreview_Unread() {
+fun NearbyUserItemPreview() {
     LanternTheme {
-        Surface(color = MaterialTheme.colors.background) {
-            Column {
-                val dummyNavController = NavController(LocalContext.current)
-                ChatListItem(ChatItem(1, "내가진짜도경원", "와, 와이파이 없이 대화 신기하당 ㅎㅎ 와이파이 없이 대화 신기하당 ㅎㅎ", "11:20 am", true), navController = dummyNavController)
-                Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f), thickness = 1.dp, modifier = Modifier.padding(start = 76.dp, end = 16.dp))
-            }
-        }
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF181818)
-@Composable
-fun ChatListItemPreview_Read() {
-    LanternTheme {
-        Surface(color = MaterialTheme.colors.background) {
-             Column {
-                val dummyNavController = NavController(LocalContext.current)
-                ChatListItem(ChatItem(2, "귀요미 이름이 엄청 길 경우엔 이렇게 보이게 됩니다", "난 귀요미", "10:20 am", false), navController = dummyNavController)
-                Divider(color = MaterialTheme.colors.onSurface.copy(alpha = 0.12f), thickness = 1.dp, modifier = Modifier.padding(start = 76.dp, end = 16.dp))
-            }
+        Surface(
+            color = NavyTop
+        ) {
+            val dummyNavController = NavController(LocalContext.current)
+            NearbyUserItem(
+                user = NearbyUser(
+                    id = 1,
+                    name = "도경원",
+                    distance = 50f
+                ),
+                navController = dummyNavController
+            )
         }
     }
 }
