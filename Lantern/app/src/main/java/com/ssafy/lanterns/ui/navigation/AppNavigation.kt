@@ -129,7 +129,6 @@ fun AppNavigation() {
         composable(AppDestinations.MYPAGE_ROUTE) {
             MainScaffold(navController = navController) { paddingValues ->
                 MyPageScreen(
-                    popBackStack = { navController.popBackStack() }, // 뒤로가기
                     onNavigateToLogin = { // 로그아웃 처리
                         navController.navigate(AppDestinations.LOGIN_ROUTE) {
                             popUpTo(navController.graph.id) { // 전체 백스택 클리어

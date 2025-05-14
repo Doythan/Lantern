@@ -56,8 +56,12 @@ fun LoginScreen(
             Log.d(TAG, "구글 로그인 성공, 결과 처리 중")
             viewModel.handleSignInResult(data)
         } else {
-            Log.w(TAG, "구글 로그인 취소 또는 실패: 결과 코드=$resultCode")
-            viewModel.resetStateToIdle()
+            Log.w(TAG, "구글 로그인 취소 또는 실패: 결과 코드=$resultCode, 데이터=${data?.toString() ?: "null"}")
+            if (data != null) {
+                viewModel.handleSignInResult(data)
+            } else {
+                viewModel.resetStateToIdle()
+            }
         }
     }
 
