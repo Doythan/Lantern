@@ -1,15 +1,42 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+# === OS ===
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+
+# === Kotlin ===
+*.class
+*.jar
+hs_err_pid*
+*.kotlin_module
+
+# === Android/Gradle ===
+.gradle/
+build/
+app/build/
+*/build/
 local.properties
+.idea
+.idea/*
+
+# APK, AAB, DEX
+*.apk
+*.ap_
+*.aab
+*.dex
+
+# Native builds
+.externalNativeBuild/
+.cxx/
+
+# Signing
+*.jks
+*.keystore
+
+# === IDE (Android Studio / IntelliJ) ===
+.idea/
+*.iml
+# 팀 설정만 트래킹하려면 예시:
+# !.idea/gradle.xml
+# !.idea/codeStyles/
+
+# === Firebase ===
+google-services.json
+
