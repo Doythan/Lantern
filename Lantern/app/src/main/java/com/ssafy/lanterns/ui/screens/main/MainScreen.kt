@@ -35,6 +35,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
 import com.ssafy.lanterns.ui.screens.main.components.AnimationValues
 import com.ssafy.lanterns.ui.screens.main.components.MainContent
 import com.ssafy.lanterns.ui.screens.main.components.RippleState
@@ -59,6 +61,7 @@ import android.content.Context
  */
 @Composable
 fun MainScreen(
+    navController: NavController,
     modifier: Modifier = Modifier,
     paddingValues: PaddingValues = PaddingValues(0.dp),
     viewModel: MainViewModel = hiltViewModel()
@@ -76,14 +79,29 @@ fun MainScreen(
     val rippleAnimatable3 = remember { Animatable(0f) }
     
     // 생명주기 관찰자
+    // TODO: [Deprecated API] LocalLifecycleOwner는 lifecycle-runtime-compose 라이브러리의 androidx.lifecycle.compose 패키지로 이동되었습니다.
+    // 추후 업데이트 시 androidx.lifecycle.compose.LocalLifecycleOwner로 교체 필요
     val lifecycleOwner = LocalLifecycleOwner.current
+    // TODO: context 변수는 BLE 로직 구현 시 사용될 예정입니다.
+    @Suppress("UNUSED_VARIABLE")
     val context = LocalContext.current
     
+    // navigateToProfile 상태가 변경되면 프로필 화면으로 이동
+    LaunchedEffect(uiState.navigateToProfile) {
+        uiState.navigateToProfile?.let { userId ->
+            // 프로필 화면으로 이동 (프로필 화면에서 채팅하기 버튼으로 채팅 화면 이동)
+            val person = uiState.nearbyPeople.find { it.userId == userId }
+            if (person != null) {
+                val route = "profile/${userId}/${person.name}/${person.distance.toInt()}m"
+                navController.navigate(route)
+            }
+            viewModel.onProfileScreenNavigated() // 네비게이션 후 상태 초기화
+        }
+    }
+    
     // =====================================================
-    // TODO: BLE 권한 및 블루투스 상태 확인 로직
-    // 이 부분에서 BLE 기능에 필요한 권한과 블루투스 상태를 확인합니다.
-    // 앱이 시작될 때 또는 화면이 활성화될 때 권한을 확인하고 처리합니다.
-    // 
+    // TODO: [BLE] BLE 권한 및 블루투스 상태 확인 로직 구현 필요
+    // 앱 시작 또는 화면 활성화 시 권한 확인 및 ViewModel에 상태 업데이트 (viewModel.updateBlePermissionStatus, viewModel.updateBluetoothState 호출)
     // LaunchedEffect(Unit) {
     //     // 블루투스 권한 확인
     //     val hasBluetoothPermissions = checkBluetoothPermissions(context)
@@ -263,6 +281,7 @@ fun MainScreen(
                 nearbyPeople = uiState.nearbyPeople,
                 showPersonListModal = uiState.showPersonListModal,
                 onShowListToggle = { viewModel.togglePersonListModal() },
+                onPersonClick = viewModel::onPersonClick,
                 rippleStates = Triple(
                     RippleState(rippleVisible.value, rippleAnimatable1.value),
                     RippleState(rippleVisible.value, rippleAnimatable2.value),
@@ -405,7 +424,7 @@ fun MainScreen(
 @Composable
 fun MainScreenPreview() {
     LanternTheme {
-        MainScreen()
+        MainScreen(navController = rememberNavController())
     }
 }
 

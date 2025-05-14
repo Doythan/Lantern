@@ -28,7 +28,10 @@ data class MainScreenState(
     
     // BLE 관련 상태 추가
     // BLE 광고 및 스캔 기능 활성화 상태
-    val isBleServiceActive: Boolean = false
+    val isBleServiceActive: Boolean = false,
+    
+    // 프로필 화면 이동을 위한 userId 상태
+    val navigateToProfile: String? = null
 )
 
 @HiltViewModel
@@ -68,7 +71,8 @@ class MainViewModel @Inject constructor(
                 isScanning = true,
                 buttonText = "탐색 중...",
                 subTextVisible = true,
-                isBleServiceActive = true // BLE 서비스 활성화 상태로 설정
+                isBleServiceActive = true, // BLE 서비스 활성화 상태로 설정
+                nearbyPeople = emptyList() // 시작할 때는 빈 리스트로 초기화
             )
         }
         
@@ -88,31 +92,81 @@ class MainViewModel @Inject constructor(
         // }
         // =====================================================
         
-        // 주기적으로 새로운 사용자를 탐지하는 작업 시작
+        // 미리 정의된 다양한 거리의 사용자들을 생성
+        val predefinedPeople = listOf(
+            // 0-100m 사이의 근거리 사용자들 (2명)
+            NearbyPerson(
+                id = 1,
+                distance = 42f,
+                angle = 45f,
+                signalStrength = 0.85f
+            ),
+            NearbyPerson(
+                id = 2,
+                distance = 87f,
+                angle = 135f,
+                signalStrength = 0.75f
+            ),
+            
+            // 100-300m 사이의 중거리 사용자들 (2명)
+            NearbyPerson(
+                id = 3,
+                distance = 154f,
+                angle = 210f,
+                signalStrength = 0.55f
+            ),
+            NearbyPerson(
+                id = 4,
+                distance = 267f,
+                angle = 315f,
+                signalStrength = 0.45f
+            ),
+            
+            // 300m 이상의 원거리 사용자들 (2명)
+            NearbyPerson(
+                id = 5,
+                distance = 345f,
+                angle = 90f,
+                signalStrength = 0.35f
+            ),
+            NearbyPerson(
+                id = 6,
+                distance = 478f,
+                angle = 270f,
+                signalStrength = 0.25f
+            )
+        )
+        
+        // 시뮬레이션 작업 시작 - 사람을 하나씩 발견하는 효과
         scanningJob = viewModelScope.launch {
-            while (true) {
-                // 일정 시간마다 새로운 사람 감지 시뮬레이션 (30% 확률)
-                if (Random.nextFloat() < 0.3 && _uiState.value.nearbyPeople.size < 8) {
-                    val currentPeople = _uiState.value.nearbyPeople
-                    val newPerson = NearbyPerson(
-                        id = currentPeople.size + 1,
-                        distance = Random.nextFloat() * 10f + 1f,  // 1~11m
-                        angle = Random.nextFloat() * 360f,         // 0~360도
-                        signalStrength = Random.nextFloat() * 0.5f + 0.5f  // 0.5~1.0 신호 강도
-                    )
-                    
-                    val updatedPeople = currentPeople + newPerson
-                    _uiState.update { state ->
-                        state.copy(
-                            nearbyPeople = updatedPeople,
-                            statusText = "주변에 ${updatedPeople.size}명이 있습니다",
-                            showListButton = updatedPeople.isNotEmpty()
-                        )
-                    }
-                }
+            val discoveredPeople = mutableListOf<NearbyPerson>()
+            
+            // 사람들을 발견하는 시뮬레이션 (가까운 사람부터 발견)
+            for (person in predefinedPeople.sortedBy { it.distance }) {
+                delay(800) // 각 사람을 발견하는데 약간의 딜레이
                 
-                // 지연 시간 (애니메이션 주기와 맞춤)
-                delay(1500)
+                discoveredPeople.add(person)
+                
+                // UI 상태 업데이트
+                _uiState.update { state ->
+                    state.copy(
+                        nearbyPeople = discoveredPeople.toList(),
+                        statusText = "주변에 ${discoveredPeople.size}명이 있습니다",
+                        showListButton = discoveredPeople.isNotEmpty()
+                    )
+                }
+            }
+            
+            // 모든 사람을 발견한 후 주기적인 상태 업데이트 시뮬레이션
+            while (true) {
+                delay(5000) // 5초마다 업데이트 확인
+                
+                // 진행 중인 스캔 상태 유지
+                _uiState.update { state ->
+                    state.copy(
+                        statusText = "주변에 ${discoveredPeople.size}명이 있습니다"
+                    )
+                }
             }
         }
     }
@@ -185,12 +239,27 @@ class MainViewModel @Inject constructor(
     }
     
     /**
+     * 사용자 목록에서 사용자를 클릭했을 때 호출됩니다.
+     */
+    fun onPersonClick(userId: String) {
+        _uiState.update { it.copy(navigateToProfile = userId) }
+    }
+
+    /**
+     * 프로필 화면으로 네비게이션 후 호출되어 상태를 초기화합니다.
+     */
+    fun onProfileScreenNavigated() {
+        _uiState.update { it.copy(navigateToProfile = null) }
+    }
+    
+    /**
      * BLE 관련 권한 상태를 업데이트합니다.
      * BLE 기능을 사용하기 위해 필요한 권한이 부여되었는지 확인하고 처리합니다.
      */
+    @Suppress("UNUSED_PARAMETER") // BLE 로직 구현 시 사용 예정
     fun updateBlePermissionStatus(granted: Boolean) {
         // =====================================================
-        // TODO: BLE 권한 상태 업데이트 로직
+        // TODO: [BLE] BLE 권한 상태 업데이트 로직
         // BLE 권한이 부여되었는지 확인하고 상태를 업데이트합니다.
         // 
         // if (granted) {
@@ -215,6 +284,7 @@ class MainViewModel @Inject constructor(
      * 블루투스 상태를 업데이트합니다.
      * 블루투스가 활성화되었는지 확인하고 처리합니다.
      */
+    @Suppress("UNUSED_PARAMETER") // BLE 로직 구현 시 사용 예정
     fun updateBluetoothState(enabled: Boolean) {
         // =====================================================
         // TODO: 블루투스 상태 업데이트 로직

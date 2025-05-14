@@ -139,8 +139,7 @@ fun PublicChatScreen(
     
     Surface(
         modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing), // 시스템 UI에 가려지지 않도록 패딩 적용
+            .fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(
@@ -152,6 +151,8 @@ fun PublicChatScreen(
                     )
                 )
                 .padding(paddingValues)
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .imePadding()
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
         ) {
             // 앱 바
@@ -169,29 +170,21 @@ fun PublicChatScreen(
                 actions = {
                     // 참여자 수 아이콘
                     IconButton(onClick = { showUsersModal = true }) {
-                        Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Filled.People,
                                 contentDescription = "참여자 목록",
                                 tint = BleAccent
                             )
-                            // 참여자 수 배지
-                            Box(
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .align(Alignment.TopEnd)
-                                    .offset(x = 4.dp, y = (-4).dp)
-                                    .clip(CircleShape)
-                                    .background(ConnectionFar),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = nearbyUsers.size.toString(),
-                                    fontSize = 10.sp,
-                                    color = TextWhite,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            Text(
+                                text = nearbyUsers.size.toString(),
+                                fontSize = 14.sp,
+                                color = TextWhite,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 },

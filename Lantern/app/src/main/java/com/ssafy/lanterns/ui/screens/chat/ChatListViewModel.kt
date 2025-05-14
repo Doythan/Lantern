@@ -59,24 +59,20 @@ class ChatListViewModel @Inject constructor(
                 // 현재 사용자 정보 확인
                 currentUser = userRepository.getCurrentUser()
                 
-                // 사용자 정보가 없으면 테스트 사용자 생성
+                // 사용자 정보가 없으면 오류 메시지 표시
                 if (currentUser == null) {
-                    currentUser = userRepository.ensureTestUser()
-                    
-                    if (currentUser == null) {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = "테스트 사용자 생성 실패"
-                            )
-                        }
-                        return@launch
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "로그인된 사용자 정보가 없습니다. 로그인을 진행해주세요."
+                        )
                     }
+                    return@launch
                 }
                 
                 // 채팅방 및 주변 사용자 로드
                 loadChatRooms()
-                generateNearbyUsers() // 주변 사용자 더미 데이터 생성 (실제로는 BLE 스캐닝으로 대체)
+                generateNearbyUsers() // 주변 사용자 데이터 생성 (실제로는 BLE 스캐닝으로 대체)
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -102,12 +98,6 @@ class ChatListViewModel @Inject constructor(
                 
                 // 채팅방별 마지막 메시지 및 상대방 정보 조회
                 val chatItems = mutableListOf<ChatItem>()
-                
-                // 기존 더미 데이터로 테스트를 위한 임시 로직 (실제 구현에서는 제거)
-                if (chatRooms.isEmpty()) {
-                    insertDummyChatData()
-                    return@launch loadChatRooms() // 재귀 호출로 다시 로드
-                }
                 
                 for (chatRoom in chatRooms) {
                     val participantId = chatRoom.participantId
@@ -149,125 +139,6 @@ class ChatListViewModel @Inject constructor(
                         errorMessage = "채팅방 목록 로드 중 오류: ${e.message}"
                     )
                 }
-            }
-        }
-    }
-    
-    /**
-     * 테스트를 위한 더미 채팅 데이터 생성 (샘플)
-     */
-    private suspend fun insertDummyChatData() {
-        try {
-            val currentUserId = currentUser?.userId ?: return
-            
-            // 먼저 DirectChatViewModel에서 생성한 테스트 사용자 확인 (userId=2)
-            val testPartner = userDao.getUserById(2L)
-            
-            // 더미 사용자 목록 준비
-            val dummyUsers = mutableListOf<User>()
-            
-            // 테스트 파트너가 없으면 테스트 사용자 추가
-            if (testPartner == null) {
-                dummyUsers.add(User(2L, "테스트 파트너", "test_device_002"))
-            }
-            
-            // 기존 더미 사용자 추가
-            dummyUsers.addAll(
-                listOf(
-                    User(100L, "도경원", "device_100"),
-                    User(101L, "귀요미", "device_101"),
-                    User(102L, "백성욱", "device_102"),
-                    User(103L, "박수민", "device_103"),
-                    User(104L, "천세욱1", "device_104"),
-                    User(105L, "천세욱2", "device_105")
-                )
-            )
-            
-            // 사용자 저장
-            dummyUsers.forEach { user ->
-                userDao.insertUser(user)
-            }
-            
-            // 채팅방 생성
-            val allUsers = if (testPartner != null) {
-                dummyUsers + testPartner
-            } else {
-                dummyUsers
-            }
-            
-            allUsers.forEach { user ->
-                // 기존 채팅방 확인
-                val existingRooms = chatRoomDao.getChatRoomsByParticipantId(user.userId)
-                
-                if (existingRooms.isEmpty()) {
-                    // 새 채팅방 생성
-                    val chatRoomId = chatRoomDao.InsertChatRoom(
-                        ChatRoom(
-                            chatRoomId = System.currentTimeMillis() + user.userId,
-                            updatedAt = LocalDateTime.now(),
-                            participantId = user.userId
-                        )
-                    )
-                    
-                    // 테스트 파트너일 경우 더 많은 샘플 메시지 추가
-                    if (user.userId == 2L) {
-                        val conversationTemplate = listOf(
-                            Pair(currentUserId, "안녕하세요! 통화 기능을 테스트해 볼까요?"),
-                            Pair(user.userId, "네, 좋아요! 어떻게 해야 하나요?"),
-                            Pair(currentUserId, "채팅방에 들어가서 위쪽에 통화 버튼을 클릭하면 됩니다."),
-                            Pair(user.userId, "확인해볼게요. 지금 해볼까요?")
-                        )
-                        
-                        val currentTime = LocalDateTime.now()
-                        
-                        // 메시지 객체 생성 및 저장
-                        conversationTemplate.mapIndexed { index, (senderId, text) ->
-                            val messageTime = currentTime.minusMinutes((conversationTemplate.size - index).toLong())
-                            val message = Messages(
-                                messageId = System.currentTimeMillis() + index,
-                                chatRoomId = chatRoomId,
-                                userId = senderId,
-                                text = text,
-                                date = messageTime
-                            )
-                            messagesDao.insertMessage(message)
-                        }
-                    } else {
-                        // 일반 더미 메시지 생성
-                        val dummyMessages = listOf(
-                            Messages(
-                                messageId = System.currentTimeMillis() + 1,
-                                userId = currentUserId,
-                                chatRoomId = chatRoomId,
-                                text = "안녕하세요, ${user.nickname}님!",
-                                date = LocalDateTime.now().minusMinutes(30)
-                            ),
-                            Messages(
-                                messageId = System.currentTimeMillis() + 2,
-                                userId = user.userId,
-                                chatRoomId = chatRoomId,
-                                text = when(user.userId) {
-                                    100L -> "와, 와이파이 없이 대화 신기하당 ㅎㅎ"
-                                    101L -> "난 귀요미"
-                                    102L -> "메시지 입력해봐.."
-                                    103L -> "나만의 채로서 일타강사."
-                                    else -> "여긴 어디? 난 누구?"
-                                },
-                                date = LocalDateTime.now().minusMinutes(15)
-                            )
-                        )
-                        
-                        // 메시지 저장
-                        dummyMessages.forEach { message ->
-                            messagesDao.insertMessage(message)
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // 오류 처리
-            _uiState.update {
-                it.copy(errorMessage = "더미 데이터 생성 중 오류: ${e.message}")
             }
         }
     }

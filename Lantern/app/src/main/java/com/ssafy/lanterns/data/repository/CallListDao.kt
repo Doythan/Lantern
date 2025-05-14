@@ -15,5 +15,8 @@ interface CallListDao {
     @Query("DELETE FROM call_list WHERE call_id = :callId")
     suspend fun deleteByCallId(callId: Long): Int
 
+    // 모든 통화 목록 정보 삭제
+    @Query("DELETE FROM call_list")
+    suspend fun deleteAllCallLists()
 
 }

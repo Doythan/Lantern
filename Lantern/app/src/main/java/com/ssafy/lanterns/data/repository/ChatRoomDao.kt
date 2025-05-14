@@ -53,5 +53,8 @@ interface ChatRoomDao {
     """)
     suspend fun getChatRoomsByParticipantId(participantId: Long): List<ChatRoom>
 
+    // 모든 채팅방 정보 삭제
+    @Query("DELETE FROM chat_room")
+    suspend fun deleteAllChatRooms()
 
 }

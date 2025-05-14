@@ -87,14 +87,71 @@ class DirectChatViewModel @Inject constructor(
         // 테스트 사용자 및 데이터 로드
         viewModelScope.launch {
             try {
-                // 테스트 사용자 생성 확인
-                currentUser = userRepository.ensureTestUser()
-                loadInitialData()
+                // 현재 사용자 정보 확인
+                currentUser = userRepository.getCurrentUser()
+                
+                // 사용자 정보가 없으면 오류 메시지 표시
+                if (currentUser == null) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "로그인된 사용자 정보가 없습니다. 로그인을 진행해주세요."
+                        )
+                    }
+                    return@launch
+                }
+
+                // 채팅 상대방 정보 가져오기
+                val participantId = userId?.toLongOrNull() ?: 2L // 기본값 설정
+                val participant = userDao.getUserById(participantId)
+                
+                if (participant == null) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = "사용자 정보를 찾을 수 없습니다."
+                        )
+                    }
+                    return@launch
+                }
+
+                // 채팅방 정보 가져오기
+                val chatRooms = chatRoomDao.getChatRoomsByParticipantId(participantId)
+                
+                var chatRoomId: Long? = null
+                if (chatRooms.isNotEmpty()) {
+                    // 이미 존재하는 채팅방 사용
+                    chatRoomId = chatRooms.first().chatRoomId
+                } else {
+                    // 새 채팅방 생성
+                    chatRoomId = chatRoomDao.InsertChatRoom(
+                        com.ssafy.lanterns.data.model.ChatRoom(
+                            chatRoomId = System.currentTimeMillis(),
+                            updatedAt = LocalDateTime.now(),
+                            participantId = participantId
+                        )
+                    )
+                }
+
+                // UI 상태 업데이트
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        participant = participant,
+                        chatRoomId = chatRoomId
+                    )
+                }
+
+                // 채팅 메시지 가져오기
+                loadInitialMessages()
+
+                // BLE 연결 시뮬레이션 (나중에 실제 BLE 연결 로직으로 대체)
+                simulateConnection()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        errorMessage = "사용자 정보 초기화 중 오류: ${e.message}"
+                        errorMessage = "초기 데이터 로드 중 오류: ${e.message}"
                     )
                 }
             }

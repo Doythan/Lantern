@@ -60,11 +60,13 @@ import kotlin.math.sin
  */
 @Composable
 fun MainContent(
+    @Suppress("UNUSED_PARAMETER") // 현재 직접 사용하지 않지만 향후 사용 예정
     isScanning: Boolean,
     onScanToggle: () -> Unit,
     nearbyPeople: List<NearbyPerson>,
     showPersonListModal: Boolean,
     onShowListToggle: () -> Unit,
+    onPersonClick: (userId: String) -> Unit,
     rippleStates: Triple<RippleState, RippleState, RippleState>,
     animationValues: AnimationValues,
     buttonText: String,
@@ -83,7 +85,7 @@ fun MainContent(
         // 첫 번째 리플
         if (ripple1.visible) {
             RippleCircle(
-                scale = 1f + ripple1.animationValue * 1.5f,
+                scale = 1f + ripple1.animationValue * 3.0f,
                 alpha = (1f - ripple1.animationValue) * 0.5f,
                 color = BleBlue2.copy(alpha = 0.3f)  // 첫 번째 파동은 밝은 시안
             )
@@ -92,7 +94,7 @@ fun MainContent(
         // 두 번째 리플
         if (ripple2.visible) {
             RippleCircle(
-                scale = 1f + ripple2.animationValue * 1.5f,
+                scale = 1f + ripple2.animationValue * 3.0f,
                 alpha = (1f - ripple2.animationValue) * 0.5f,
                 color = BleBlue1.copy(alpha = 0.3f)  // 두 번째 파동은 깊은 파란색
             )
@@ -101,7 +103,7 @@ fun MainContent(
         // 세 번째 리플
         if (ripple3.visible) {
             RippleCircle(
-                scale = 1f + ripple3.animationValue * 1.5f,
+                scale = 1f + ripple3.animationValue * 3.0f,
                 alpha = (1f - ripple3.animationValue) * 0.5f,
                 color = BleAccent.copy(alpha = 0.2f)  // 세 번째 파동은 네온 민트
             )
@@ -109,19 +111,33 @@ fun MainContent(
         
         // 주변 사람 점 표시
         nearbyPeople.forEach { person ->
-            // 중앙 버튼의 크기보다 조금 더 큰 원 위에 점 배치
-            val radius = 100 * (0.6 + person.distance / 10f) // 최소 반경 설정
+            // 중앙 버튼의 크기(160dp)보다 최소 40dp 이상 떨어지도록 설정
+            // 160dp/2 + 40dp = 120dp가 최소 반경
+            val minRadius = 120.0 // 중앙 버튼과 겹치지 않는 최소 반경
+            val maxRadius = 220.0 // 화면 내에 표시되는 최대 반경
+            
+            // 거리에 따라 반경 계산 (최소값 보장)
+            val distanceRatio = person.distance / 500.0 // 거리 비율 조정
+            val radius = minRadius + (maxRadius - minRadius) * distanceRatio.coerceIn(0.0, 1.0)
+            
             val angleInRadians = Math.toRadians(person.angle.toDouble())
             val x = radius * cos(angleInRadians)
             val y = radius * sin(angleInRadians)
             
-            PersonDot(
-                modifier = Modifier.offset(x = x.dp, y = y.dp),
-                signalStrength = person.signalStrength,
-                pulseScale = animationValues.dotPulseScale,
-                glowAlpha = animationValues.dotGlowAlpha,
-                distance = person.distance
-            )
+            Box(
+                modifier = Modifier
+                    .offset(x = x.dp, y = y.dp)
+                    .size(50.dp), // 클릭 가능한 영역 확보 (크기 고정)
+                contentAlignment = Alignment.Center
+            ) {
+                PersonDot(
+                    modifier = Modifier,
+                    signalStrength = person.signalStrength,
+                    pulseScale = animationValues.dotPulseScale,
+                    glowAlpha = animationValues.dotGlowAlpha,
+                    distance = person.distance
+                )
+            }
         }
         
         // 중앙 스캔 버튼
@@ -172,7 +188,8 @@ fun MainContent(
         if (showPersonListModal) {
             NearbyPersonListModal(
                 people = nearbyPeople,
-                onDismiss = onShowListToggle
+                onDismiss = onShowListToggle,
+                onPersonClick = onPersonClick
             )
         }
     }

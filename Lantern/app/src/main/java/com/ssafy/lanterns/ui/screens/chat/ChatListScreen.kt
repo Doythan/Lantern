@@ -45,7 +45,6 @@ import com.ssafy.lanterns.ui.theme.BleBlue2
 import com.ssafy.lanterns.ui.theme.ConnectionNear
 import com.ssafy.lanterns.ui.theme.ConnectionMedium
 import com.ssafy.lanterns.ui.theme.ConnectionFar
-import com.ssafy.lanterns.utils.getConnectionColorByDistance
 
 // Data model for Chat List item
 data class ChatItem(
@@ -65,6 +64,17 @@ data class NearbyUser(
 )
 
 // Removed the local getProfileImageResId function, it's now in ImageUtils.kt
+
+/**
+ * 거리에 따른 색상을 반환합니다 (프로필 화면과 동일한 로직).
+ */
+private fun getDistanceColorForChat(distance: Float): Color {
+    return when {
+        distance < 100f -> ConnectionNear
+        distance < 300f -> ConnectionMedium
+        else -> ConnectionFar
+    }
+}
 
 @Composable
 fun ChatListScreen(
@@ -176,7 +186,7 @@ fun NearbySection(nearbyUsers: List<NearbyUser>, navController: NavController) {
 
 @Composable
 fun NearbyUserItem(user: NearbyUser, navController: NavController) {
-    val connectionColor = getConnectionColorByDistance(user.distance)
+    val connectionColor = getDistanceColorForChat(user.distance)
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -215,13 +225,23 @@ fun NearbyUserItem(user: NearbyUser, navController: NavController) {
             fontWeight = FontWeight.Medium
         )
         
-        // Distance
-        Text(
-            text = "${user.distance.toInt()}m",
-            color = connectionColor,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold
-        )
+        // Distance with background
+        Box(
+            modifier = Modifier
+                .padding(top = 4.dp)
+                .background(
+                    color = connectionColor.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = "${user.distance.toInt()}m",
+                color = connectionColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -282,7 +302,7 @@ fun PublicChatListItem(navController: NavController) {
 
 @Composable
 fun ChatListItem(chat: ChatItem, navController: NavController) {
-    val connectionColor = getConnectionColorByDistance(chat.distance)
+    val connectionColor = getDistanceColorForChat(chat.distance)
     
     Row(
         modifier = Modifier
@@ -367,13 +387,22 @@ fun ChatListItem(chat: ChatItem, navController: NavController) {
                     modifier = Modifier.weight(1f)
                 )
                 
-                // 거리 표시
-                Text(
-                    text = "${chat.distance.toInt()}m",
-                    color = connectionColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                // 거리 표시 (배경 추가)
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = connectionColor.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = "${chat.distance.toInt()}m",
+                        color = connectionColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

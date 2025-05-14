@@ -31,5 +31,8 @@ interface FollowDao {
     """)
     suspend fun searchFollowsByNickname(nickname: String): List<Follow>
 
+    // 모든 팔로우 정보 삭제
+    @Query("DELETE FROM follow")
+    suspend fun deleteAllFollows()
 
 }
