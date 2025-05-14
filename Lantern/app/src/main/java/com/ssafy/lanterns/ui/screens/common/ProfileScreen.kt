@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.ssafy.lanterns.R
 import com.ssafy.lanterns.ui.theme.*
+import com.ssafy.lanterns.utils.getConnectionColorByDistance
 
 data class UserProfileData(
     val userId: String,
@@ -29,6 +30,26 @@ data class UserProfileData(
     val distance: String,
     val profileImageResId: Int = R.drawable.default_profile // 기본 프로필 이미지 리소스 ID (resources 폴더에 추가 필요)
 )
+
+/**
+ * 거리 문자열에서 숫자 부분만 추출하여 Float로 변환합니다.
+ * 예: "123m" -> 123.0f
+ */
+private fun extractDistanceValue(distanceString: String): Float {
+    return distanceString.replace(Regex("[^0-9]"), "").toFloatOrNull() ?: 0f
+}
+
+/**
+ * 거리에 따른 색상을 반환합니다.
+ */
+private fun getDistanceColor(distanceString: String): Color {
+    val distance = extractDistanceValue(distanceString)
+    return when {
+        distance < 100f -> ConnectionNear
+        distance < 300f -> ConnectionMedium
+        else -> ConnectionFar
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,14 +122,24 @@ fun ProfileScreen(
                     color = TextWhite
                 )
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 // 거리 정보
-                Text(
-                    text = userData.distance,
-                    fontSize = 18.sp,
-                    color = BleAccent
-                )
+                Box(
+                    modifier = Modifier
+                        .background(
+                            color = getDistanceColor(userData.distance).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = userData.distance,
+                        fontSize = 20.sp,
+                        color = getDistanceColor(userData.distance),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
                 
                 Spacer(modifier = Modifier.weight(1f))
                 
@@ -116,7 +147,7 @@ fun ProfileScreen(
                 Button(
                     onClick = {
                         // 채팅 화면으로 이동
-                        navController.navigate("directchat/${userData.userId}")
+                        navController.navigate("direct_chat/${userData.userId}")
                     },
                     modifier = Modifier
                         .fillMaxWidth()

@@ -7,6 +7,7 @@ import kotlin.random.Random
  */
 data class NearbyPerson(
     val id: Int,
+    val userId: String = id.toString(), // 사용자 고유 ID 추가
     val distance: Float, // 거리 (미터 단위)
     val angle: Float,    // 시계 방향으로 각도 (0-360도)
     val signalStrength: Float, // 신호 강도 (0.0-1.0)

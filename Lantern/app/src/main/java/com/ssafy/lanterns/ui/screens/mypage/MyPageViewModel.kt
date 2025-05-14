@@ -33,17 +33,6 @@ data class MyPageUiState(
     val availableProfileImageResources: Map<Int, Int> = getAllProfileImageResources() // 직접 함수 호출
 )
 
-// 사용할 프로필 이미지 리소스 ID 목록 정의 -> ImageUtils.getAllProfileImageResources()로 대체 가능하므로 제거 또는 주석 처리
-/*
-val defaultProfileImages: List<Int> = listOf(
-    R.drawable.profile_1, R.drawable.profile_2, R.drawable.profile_3,
-    R.drawable.profile_4, R.drawable.profile_5, R.drawable.profile_6,
-    R.drawable.profile_7, R.drawable.profile_8, R.drawable.profile_9,
-    R.drawable.profile_10, R.drawable.profile_11, R.drawable.profile_12,
-    R.drawable.profile_13, R.drawable.profile_14, R.drawable.profile_15
-)
-*/
-
 @HiltViewModel
 class MyPageViewModel @Inject constructor(
     private val userRepository: UserRepository,
@@ -211,6 +200,8 @@ class MyPageViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
+            // 로컬 DB 데이터 초기화
+            userRepository.clearAllLocalData()
             val result = authRepository.signOut()
             when (result) {
                 is AuthResult.Success -> {

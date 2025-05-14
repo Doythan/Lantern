@@ -22,9 +22,11 @@ import com.ssafy.lanterns.ui.screens.login.LoginScreen
 import com.ssafy.lanterns.ui.screens.main.MainScreen
 import com.ssafy.lanterns.ui.screens.mypage.MyPageScreen
 import com.ssafy.lanterns.ui.screens.signup.SignupScreen
+import com.ssafy.lanterns.ui.screens.splash.SplashScreen // 스플래시 화면 임포트 추가
 
 // 네비게이션 라우트 정의
 object AppDestinations {
+    const val SPLASH_ROUTE = "splash" // 스플래시 화면 라우트 추가
     const val LOGIN_ROUTE = "login"
     const val SIGNUP_ROUTE = "signup"
     // const val CHAT_ROUTE = "chat" // 삭제된 화면에 대한 라우트 제거
@@ -59,17 +61,23 @@ fun AppNavigation() {
     // NavController 생성
     val navController = rememberNavController()
 
-    // NavHost 설정
-    NavHost(navController = navController, startDestination = AppDestinations.LOGIN_ROUTE) {
+    // NavHost 설정 - 시작 화면을 스플래시 화면으로 변경
+    NavHost(navController = navController, startDestination = AppDestinations.SPLASH_ROUTE) {
+        // 스플래시 화면 추가
+        composable(AppDestinations.SPLASH_ROUTE) {
+            SplashScreen(
+                onTimeout = {
+                    // 스플래시 타임아웃 후 로그인 화면으로 이동
+                    navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                        popUpTo(AppDestinations.SPLASH_ROUTE) { inclusive = true }
+                    }
+                }
+            )
+        }
+        
         // 로그인 화면
         composable(AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
-                onSignUpClick = { navController.navigate(AppDestinations.SIGNUP_ROUTE) },
-                // 아래 클릭 핸들러들은 로그인 성공 시 이동으로 대체될 수 있음
-                onMyPageClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) },
-                onFriendListClick = { navController.navigate(AppDestinations.FRIENDLIST_ROUTE) },
-                onIncomingCallClick = { navController.navigate(AppDestinations.INCOMING_CALL_ROUTE) }, // 테스트용?
-                onHomeClick = { navController.navigate(AppDestinations.HOME_ROUTE) }, // 주석 해제
                 onLoginSuccess = {
                     // 로그인 성공 시 MAIN_SCREEN_ROUTE로 이동하고 로그인 화면은 백스택에서 제거
                     navController.navigate(AppDestinations.MAIN_SCREEN_ROUTE) {
@@ -89,7 +97,7 @@ fun AppNavigation() {
         // 새로운 메인 화면 (네비게이션 바 포함)
         composable(AppDestinations.MAIN_SCREEN_ROUTE) {
             MainScaffold(navController = navController) { paddingValues ->
-                MainScreen(paddingValues = paddingValues)
+                MainScreen(paddingValues = paddingValues, navController = navController)
             }
         }
 

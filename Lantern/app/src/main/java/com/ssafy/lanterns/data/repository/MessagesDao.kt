@@ -55,5 +55,8 @@ interface MessagesDao {
     ): List<Messages>
 
 
+    // 모든 메시지 정보 삭제
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
 
 }

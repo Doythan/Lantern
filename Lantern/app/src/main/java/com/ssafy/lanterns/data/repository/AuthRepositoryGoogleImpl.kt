@@ -47,35 +47,8 @@ class AuthRepositoryGoogleImpl @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e(TAG, "구글 로그인 중 오류 발생: ${e.message}", e)
-            
-            // 네트워크 오류 등의 경우 테스트 사용자로 자동 로그인 시도
-            return loginWithTestUser()
-        }
-    }
-
-    /**
-     * 테스트 사용자로 로그인합니다. 네트워크 오류 등 서버 연결이 불가능한 경우 사용됩니다.
-     */
-    private suspend fun loginWithTestUser(): AuthResult<User> {
-        return try {
-            Log.i(TAG, "테스트 사용자로 오프라인 로그인 시도")
-            
-            // 테스트 사용자 생성 또는 가져오기
-            val testUser = userRepository.ensureTestUser()
-            
-            // 테스트 사용자 정보 저장
-            tokenManager.saveAccessToken("test_token_${testUser.userId}")
-            tokenManager.saveUserInfo(
-                userId = testUser.userId,
-                email = "test@example.com",
-                nickname = testUser.nickname
-            )
-            
-            Log.i(TAG, "테스트 사용자 로그인 성공: ${testUser.nickname}")
-            AuthResult.Success(testUser)
-        } catch (e: Exception) {
-            Log.e(TAG, "테스트 사용자 로그인 실패", e)
-            AuthResult.Error("오프라인 모드 로그인 실패: ${e.message}")
+            // 네트워크 오류 처리
+            return AuthResult.Error("구글 로그인 중 오류 발생: ${e.message}")
         }
     }
 

@@ -2,6 +2,7 @@ package com.ssafy.lanterns.ui.screens.login // 패키지 경로는 실제 프로
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,6 +24,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 private const val TAG = "LoginViewModel"
@@ -44,6 +48,24 @@ class LoginViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()
+
+    // Video Toggle State - START
+    private val _isVideoASelected = MutableStateFlow(true) // true면 main_video3, false면 main_video4
+    val isVideoASelected: StateFlow<Boolean> = _isVideoASelected.asStateFlow()
+
+    val currentVideoUri: StateFlow<Uri> = isVideoASelected.map { isA ->
+        val videoResId = if (isA) R.raw.main_video3 else R.raw.main_video4
+        Uri.parse("android.resource://${applicationContext.packageName}/$videoResId")
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Lazily, // 필요할 때 스트림 시작
+        initialValue = Uri.parse("android.resource://${applicationContext.packageName}/${R.raw.main_video3}") // 초기값
+    )
+
+    fun toggleVideo() {
+        _isVideoASelected.value = !_isVideoASelected.value
+    }
+    // Video Toggle State - END
 
     // 초기화 시 로그인 상태 확인 (앱 시작 시 자동 로그인)
     init {
@@ -133,13 +155,6 @@ class LoginViewModel @Inject constructor(
             Log.e(TAG, "Google Sign-In failed: statusCode=$statusCode, statusMessage='$statusMessage'")
             Log.e(TAG, "Google SignIn API 예외 상세: code=$statusCode, message=${e.message}, status=${e.status}", e)
             
-            // 네트워크 오류일 경우 테스트 사용자로 자동 로그인 시도 (임시 조치)
-            if (statusCode == 7) { // NETWORK_ERROR
-                Log.w(TAG, "네트워크 오류 발생, 테스트 사용자로 자동 로그인 시도")
-                createTestUserAndLogin() // 개발 중 테스트 편의를 위해 임시로 유지
-                return
-            }
-            
             val errorMessage = when (e.statusCode) {
                 10 -> "앱이 Google에 등록되지 않았거나 설정 오류입니다 (DEVELOPER_ERROR). statusMessage='$statusMessage'"
                 16 -> "앱에 대한 적절한 인증 설정이 없습니다 (INTERNAL_ERROR). statusMessage='$statusMessage'"
@@ -152,9 +167,7 @@ class LoginViewModel @Inject constructor(
             _uiState.update { LoginUiState.Error(errorMessage) }
         } catch (e: Exception) {
             Log.e(TAG, "로그인 처리 중 예외 발생", e)
-            // 일반 예외 발생 시에도 테스트 사용자로 로그인 시도 (임시 조치)
-            Log.w(TAG, "예외 발생, 테스트 사용자로 자동 로그인 시도")
-            createTestUserAndLogin() // 개발 중 테스트 편의를 위해 임시로 유지
+            _uiState.update { LoginUiState.Error("로그인 처리 중 오류 발생: ${e.message}") }
         }
     }
 
@@ -234,6 +247,9 @@ class LoginViewModel @Inject constructor(
             _uiState.update { LoginUiState.Loading }
             
             try {
+                // 로컬 DB 데이터 초기화
+                userRepository.clearAllLocalData()
+                
                 // Google 로그아웃
                 googleSignInClient.signOut().addOnCompleteListener {
                     Log.d(TAG, "Google 로그아웃 완료")
@@ -260,22 +276,5 @@ class LoginViewModel @Inject constructor(
      */
     fun resetStateToIdle() {
          _uiState.update { LoginUiState.Idle }
-    }
-
-    /**
-     * 테스트 사용자를 생성하고 자동으로 로그인합니다.
-     */
-    private fun createTestUserAndLogin() {
-        viewModelScope.launch {
-            try {
-                // 테스트 사용자 생성 또는 가져오기
-                val testUser = userRepository.ensureTestUser()
-                Log.i(TAG, "테스트 사용자 로그인 성공: ${testUser.nickname}, 이미지: ${testUser.selectedProfileImageNumber}")
-                _uiState.update { LoginUiState.Success(testUser) }
-            } catch (e: Exception) {
-                Log.e(TAG, "테스트 사용자 로그인 실패", e)
-                _uiState.update { LoginUiState.Error("테스트 사용자 로그인 실패: ${e.message}") }
-            }
-        }
     }
 } 

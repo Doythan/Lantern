@@ -71,6 +71,7 @@ android {
     buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -127,6 +128,9 @@ dependencies {
     implementation("androidx.compose.animation:animation:1.6.5")
     implementation("androidx.compose.animation:animation-core:1.6.5")
     implementation("androidx.compose.material:material-icons-extended:1.6.5")
+    implementation("androidx.media3:media3-exoplayer:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
+    implementation("androidx.media3:media3-common:1.3.1")
 
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)

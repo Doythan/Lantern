@@ -73,9 +73,11 @@ abstract class DataModule { // object -> abstract class
         fun provideUserRepositoryImpl(
             userDao: UserDao,
             chatRoomDao: ChatRoomDao,
-            messagesDao: MessagesDao
+            messagesDao: MessagesDao,
+            followDao: FollowDao,
+            callListDao: CallListDao
         ): UserRepositoryImpl {
-            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao)
+            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao)
         }
 
         // AdvertiserManager, GattServerManager, GattClientManager @Provides도 여기로 이동
