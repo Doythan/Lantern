@@ -13,5 +13,8 @@ data class User(
     val nickname: String,
 
     @ColumnInfo(name = "device_id")
-    val deviceId: String
+    val deviceId: String,
+
+    @ColumnInfo(name = "selected_profile_image_number", defaultValue = "1")
+    val selectedProfileImageNumber: Int = 1
 )

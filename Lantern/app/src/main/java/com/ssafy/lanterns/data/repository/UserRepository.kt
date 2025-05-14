@@ -10,6 +10,9 @@ interface UserRepository {
     suspend fun getCurrentUser(): User?
     suspend fun updateUser(user: User)
     suspend fun ensureTestUser(): User
+    suspend fun updateNickname(userId: Long, nickname: String)
+    suspend fun getUserById(userId: Long): User?
+    suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int)
     
     // 테스트 채팅방 생성 함수 추가
     suspend fun createTestChatRooms(): List<ChatRoom>

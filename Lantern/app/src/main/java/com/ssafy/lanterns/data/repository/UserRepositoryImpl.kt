@@ -49,6 +49,7 @@ class UserRepositoryImpl @Inject constructor(
             userId = 1L,
             nickname = "테스트 사용자",
             deviceId = "test_device_001"
+            // selectedProfileImageNumber는 기본값 1로 자동 설정됨
         )
         saveUser(testUser)
         
@@ -206,5 +207,17 @@ class UserRepositoryImpl @Inject constructor(
         chatRoomDao.updateChatRoomUpdateAt(3L)
         
         return chatRooms
+    }
+
+    override suspend fun updateNickname(userId: Long, nickname: String) {
+        userDao.updateNickname(userId, nickname)
+    }
+
+    override suspend fun getUserById(userId: Long): User? {
+        return userDao.getUserById(userId)
+    }
+
+    override suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int) {
+        userDao.updateProfileImageNumber(userId, profileImageNumber)
     }
 } 

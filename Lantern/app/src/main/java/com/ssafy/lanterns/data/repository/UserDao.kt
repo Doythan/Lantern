@@ -26,6 +26,10 @@ interface UserDao {
     @Query("UPDATE `user` SET nickname = :nickname WHERE user_id = :userId")
     suspend fun updateNickname(userId: Long, nickname: String): Int
 
+    // 프로필 이미지 번호 변경
+    @Query("UPDATE `user` SET selected_profile_image_number = :profileImageNumber WHERE user_id = :userId")
+    suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int): Int
+
     // 모든 사용자 정보 삭제
     @Query("DELETE FROM `user`")
     suspend fun deleteAllUsers()

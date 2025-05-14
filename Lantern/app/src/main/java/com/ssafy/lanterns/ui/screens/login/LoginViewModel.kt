@@ -55,16 +55,17 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             if (authRepository.isLoggedIn()) {
                 val userId = authRepository.getCurrentUserId() ?: return@launch
-                val nickname = authRepository.getCurrentUserNickname() ?: return@launch
-                
-                val user = User(
-                    userId = userId,
-                    nickname = nickname,
-                    deviceId = ""
-                )
+                // 로컬 DB에서 전체 User 객체를 가져와서 selectedProfileImageNumber도 포함하도록 수정
+                val user = userRepository.getUserById(userId) ?: run {
+                    // 만약 로컬에 없다면 (매우 드문 경우), 최소한의 정보로 생성하거나 로그아웃 처리
+                    Log.w(TAG, "자동 로그인 시도 중 로컬 DB에서 userId: $userId 사용자 정보를 찾을 수 없습니다.")
+                    // 필요하다면 여기서 로그아웃 처리 또는 기본 사용자 생성 로직 추가
+                    // 우선은 AuthRepository에서 가져온 정보로 최소 User 객체 생성
+                    User(userId = userId, nickname = authRepository.getCurrentUserNickname() ?: "Unknown", deviceId = "")
+                }
                 
                 _uiState.update { LoginUiState.Success(user) }
-                Log.d(TAG, "자동 로그인 성공: ${user.nickname}")
+                Log.d(TAG, "자동 로그인 성공: ${user.nickname}, 이미지: ${user.selectedProfileImageNumber}")
             }
         }
     }
@@ -91,7 +92,7 @@ class LoginViewModel @Inject constructor(
     fun getSignInIntent(): Intent {
         // 항상 새로운 구글 로그인 세션을 시작하도록 기존 세션 로그아웃
         googleSignInClient.signOut().addOnFailureListener { e ->
-            Log.e(TAG, "Google 로그아웃 실패", e)
+            Log.e(TAG, "Google 로그아웃 실패 (getSignInIntent 시)", e)
         }
         
         return googleSignInClient.signInIntent
@@ -127,30 +128,33 @@ class LoginViewModel @Inject constructor(
         } catch (e: ApiException) {
             // 로그인 실패 처리
             val statusCode = e.statusCode
-            Log.e(TAG, "Google SignIn API 예외: code=$statusCode", e)
+            val statusMessage = e.status?.statusMessage ?: "null"
             
-            // 네트워크 오류일 경우 테스트 사용자로 자동 로그인 시도
+            Log.e(TAG, "Google Sign-In failed: statusCode=$statusCode, statusMessage='$statusMessage'")
+            Log.e(TAG, "Google SignIn API 예외 상세: code=$statusCode, message=${e.message}, status=${e.status}", e)
+            
+            // 네트워크 오류일 경우 테스트 사용자로 자동 로그인 시도 (임시 조치)
             if (statusCode == 7) { // NETWORK_ERROR
                 Log.w(TAG, "네트워크 오류 발생, 테스트 사용자로 자동 로그인 시도")
-                createTestUserAndLogin()
+                createTestUserAndLogin() // 개발 중 테스트 편의를 위해 임시로 유지
                 return
             }
             
             val errorMessage = when (e.statusCode) {
-                10 -> "앱이 Google에 등록되지 않았거나 설정 오류입니다." // DEVELOPER_ERROR
-                16 -> "앱에 대한 적절한 인증 설정이 없습니다." // INTERNAL_ERROR
-                7 -> "네트워크 오류가 발생했습니다." // NETWORK_ERROR
-                12501 -> "로그인이 취소되었습니다." // SIGN_IN_CANCELLED
-                12500 -> "Google Play 서비스 업데이트가 필요합니다." // SIGN_IN_FAILED
-                else -> "구글 로그인 중 오류가 발생했습니다. (코드: ${e.statusCode})"
+                10 -> "앱이 Google에 등록되지 않았거나 설정 오류입니다 (DEVELOPER_ERROR). statusMessage='$statusMessage'"
+                16 -> "앱에 대한 적절한 인증 설정이 없습니다 (INTERNAL_ERROR). statusMessage='$statusMessage'"
+                7 -> "네트워크 오류가 발생했습니다 (NETWORK_ERROR)"
+                12501 -> "로그인이 취소되었습니다 (SIGN_IN_CANCELLED)"
+                12500 -> "Google Play 서비스 업데이트가 필요합니다 (SIGN_IN_FAILED)"
+                else -> "구글 로그인 중 오류가 발생했습니다. 코드: $statusCode, 메시지: '$statusMessage'"
             }
             
             _uiState.update { LoginUiState.Error(errorMessage) }
         } catch (e: Exception) {
             Log.e(TAG, "로그인 처리 중 예외 발생", e)
-            // 일반 예외 발생 시에도 테스트 사용자로 로그인 시도
+            // 일반 예외 발생 시에도 테스트 사용자로 로그인 시도 (임시 조치)
             Log.w(TAG, "예외 발생, 테스트 사용자로 자동 로그인 시도")
-            createTestUserAndLogin()
+            createTestUserAndLogin() // 개발 중 테스트 편의를 위해 임시로 유지
         }
     }
 
@@ -159,6 +163,7 @@ class LoginViewModel @Inject constructor(
      */
     private fun googleLoginWithIdToken(idToken: String, account: GoogleSignInAccount) {
         viewModelScope.launch {
+            _uiState.update { LoginUiState.Loading } // 명시적 로딩 상태 업데이트
             try {
                 // ID 토큰으로 백엔드 인증 시도
                 val result = authRepository.googleLogin(idToken)
@@ -166,10 +171,36 @@ class LoginViewModel @Inject constructor(
                 when (result) {
                     is AuthResult.Success -> {
                         // 성공: 사용자 정보 저장
-                        val user = result.data
-                        userRepository.saveUser(user)
-                        Log.i(TAG, "백엔드 인증 성공: ${user.nickname}")
-                        _uiState.update { LoginUiState.Success(user) }
+                        val backendUser = result.data // 백엔드로부터 받은 User 객체
+                        var userToSave = backendUser
+
+                        // 1. 로컬 DB에서 기존 사용자 정보 조회
+                        val localUser = userRepository.getUserById(backendUser.userId)
+
+                        if (localUser != null) {
+                            // 2. 로컬 DB에 정보가 있다면, 로컬 값을 우선으로 User 객체 업데이트
+                            Log.d(TAG, "로컬 DB 사용자 정보 발견: ${localUser.nickname}, 이미지: ${localUser.selectedProfileImageNumber}")
+                            Log.d(TAG, "백엔드 수신 정보: ${backendUser.nickname}, 이미지 (기본값 가정): ${backendUser.selectedProfileImageNumber}")
+
+                            userToSave = backendUser.copy(
+                                nickname = localUser.nickname, // 로컬 DB의 닉네임 사용
+                                selectedProfileImageNumber = localUser.selectedProfileImageNumber // 로컬 DB의 이미지 번호 사용
+                            )
+                            Log.d(TAG, "로컬 우선 적용된 정보: ${userToSave.nickname}, 이미지: ${userToSave.selectedProfileImageNumber}")
+                        } else {
+                            // 3. 로컬 DB에 정보가 없다면 (최초 로그인 등), 백엔드 정보를 그대로 사용하되,
+                            // selectedProfileImageNumber는 User 모델의 기본값(1)으로 설정되도록 명시.
+                            // (백엔드 응답에 이 필드가 없다면 User 생성 시 기본값이 사용될 것이나, 명확성을 위해)
+                            userToSave = backendUser.copy(
+                                // nickname은 백엔드에서 온 값을 그대로 사용 (최초이므로)
+                                selectedProfileImageNumber = 1 // 최초 로그인이므로 기본 이미지 번호 1로 설정
+                            )
+                            Log.d(TAG, "로컬 DB 사용자 정보 없음. 백엔드 정보 기반으로 생성: ${userToSave.nickname}, 이미지: ${userToSave.selectedProfileImageNumber}")
+                        }
+                        
+                        userRepository.saveUser(userToSave) // 최종 사용자 정보 저장
+                        Log.i(TAG, "백엔드 인증 및 로컬 DB 저장 성공: ${userToSave.nickname}, 이미지: ${userToSave.selectedProfileImageNumber}")
+                        _uiState.update { LoginUiState.Success(userToSave) }
                     }
                     is AuthResult.Error -> {
                         // 실패: 오류 메시지 처리
@@ -177,7 +208,9 @@ class LoginViewModel @Inject constructor(
                         
                         _uiState.update { LoginUiState.Error("백엔드 인증 실패: ${result.message}") }
                         // 백엔드 인증 실패 시 Google 로그아웃
-                        googleSignInClient.signOut()
+                        googleSignInClient.signOut().addOnFailureListener { e ->
+                            Log.e(TAG, "Google 로그아웃 실패 (백엔드 인증 실패 시)", e)
+                        }
                     }
                     is AuthResult.Loading -> {
                         // 이미 로딩 상태이므로 추가 작업 불필요
@@ -186,7 +219,9 @@ class LoginViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "백엔드 인증 중 예외 발생", e)
                 _uiState.update { LoginUiState.Error("백엔드 인증 중 오류 발생: ${e.message}") }
-                googleSignInClient.signOut()
+                googleSignInClient.signOut().addOnFailureListener { ex ->
+                    Log.e(TAG, "Google 로그아웃 실패 (백엔드 인증 예외 시)", ex)
+                }
             }
         }
     }
@@ -200,19 +235,22 @@ class LoginViewModel @Inject constructor(
             
             try {
                 // Google 로그아웃
-                googleSignInClient.signOut()
+                googleSignInClient.signOut().addOnCompleteListener {
+                    Log.d(TAG, "Google 로그아웃 완료")
+                }
                 
                 // 백엔드 로그아웃 및 로컬 데이터 삭제
-                val result = authRepository.signOut()
+                val result = authRepository.signOut() // authRepository에서 로컬 user 정보도 삭제해야 함
                 if (result is AuthResult.Success) {
                     _uiState.update { LoginUiState.Idle }
-                    Log.i(TAG, "로그아웃 성공")
+                    Log.i(TAG, "로그아웃 성공 (ViewModel)")
                 } else if (result is AuthResult.Error) {
                     _uiState.update { LoginUiState.Error("로그아웃 중 오류 발생: ${result.message}") }
+                     Log.w(TAG, "로그아웃 실패 (ViewModel): ${result.message}")
                 }
             } catch (e: Exception) {
                 _uiState.update { LoginUiState.Error("로그아웃 중 오류 발생: ${e.message}") }
-                Log.e(TAG, "로그아웃 중 예외 발생", e)
+                Log.e(TAG, "로그아웃 중 예외 발생 (ViewModel)", e)
             }
         }
     }
@@ -232,7 +270,7 @@ class LoginViewModel @Inject constructor(
             try {
                 // 테스트 사용자 생성 또는 가져오기
                 val testUser = userRepository.ensureTestUser()
-                Log.i(TAG, "테스트 사용자 로그인 성공: ${testUser.nickname}")
+                Log.i(TAG, "테스트 사용자 로그인 성공: ${testUser.nickname}, 이미지: ${testUser.selectedProfileImageNumber}")
                 _uiState.update { LoginUiState.Success(testUser) }
             } catch (e: Exception) {
                 Log.e(TAG, "테스트 사용자 로그인 실패", e)

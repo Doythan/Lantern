@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "70346d7f97ce803a04c58b4780c85c5e",
+    "identityHash": "39c027611c2b7dacc4a7db0e20bb7fc7",
     "entities": [
       {
         "tableName": "user",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER NOT NULL, `nickname` TEXT NOT NULL, `device_id` TEXT NOT NULL, PRIMARY KEY(`user_id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`user_id` INTEGER NOT NULL, `nickname` TEXT NOT NULL, `device_id` TEXT NOT NULL, `selected_profile_image_number` INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(`user_id`))",
         "fields": [
           {
             "fieldPath": "userId",
@@ -25,6 +25,13 @@
             "columnName": "device_id",
             "affinity": "TEXT",
             "notNull": true
+          },
+          {
+            "fieldPath": "selectedProfileImageNumber",
+            "columnName": "selected_profile_image_number",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
           }
         ],
         "primaryKey": {
@@ -192,7 +199,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '70346d7f97ce803a04c58b4780c85c5e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '39c027611c2b7dacc4a7db0e20bb7fc7')"
     ]
   }
 }

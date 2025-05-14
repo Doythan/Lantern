@@ -13,6 +13,7 @@ ksp {
 android {
     namespace = "com.ssafy.lanterns"
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.ssafy.lanterns"
         minSdk = 31
@@ -32,13 +33,29 @@ android {
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // app/keystores/shared-debug.jks
+            storeFile = file("keystores/shared-debug.jks")
+            storePassword = "team204"
+            keyAlias = "e204debugkey"
+            keyPassword = "team204"
+        }
+    }
+
     buildTypes {
-        release {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = true
+        }
+        getByName("release") {
+            // 릴리스 빌드 기본 설정만 유지
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            isDebuggable = false
         }
     }
 
@@ -71,10 +88,7 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    
-    // 구글 Material Design 라이브러리는 필요 시 사용 (AppCompat 의존성으로 필요할 수 있음)
     implementation(libs.material)
-    
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     testImplementation(libs.junit)
@@ -82,7 +96,6 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     // Room
-    val roomVersion = "2.6.0"
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
@@ -106,32 +119,29 @@ dependencies {
     
     // Compose Material 관련 의존성
     implementation(libs.androidx.compose.material.icons)
-    implementation("androidx.compose.material:material:1.6.5") // Material 2 - 기존 코드와의 호환성
-    implementation("androidx.compose.material3:material3:1.2.1") // Material 3 - 새로운 UI
+    implementation("androidx.compose.material:material:1.6.5")
+    implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
     
-    // Compose Animation - 명시적으로 추가
+    // Compose Animation
     implementation("androidx.compose.animation:animation:1.6.5")
     implementation("androidx.compose.animation:animation-core:1.6.5")
-    
-    // Compose Material Icons Extended - 추가 아이콘 세트
     implementation("androidx.compose.material:material-icons-extended:1.6.5")
-    
+
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Google Sign-In - Firebase 의존성 제거
-    implementation("com.google.android.gms:play-services-auth:20.7.0") // 최신 안정 버전으로 변경
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 
-    // Hilt (버전은 프로젝트 상황에 맞게 조정)
+    // Hilt
     implementation("com.google.dagger:hilt-android:2.51.1")
     ksp("com.google.dagger:hilt-compiler:2.51.1")
-    // ViewModel 주입 (@HiltViewModel)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
-    // Accompanist Permissions (권한 요청 UI)
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0") // 최신 버전 확인
+    // Accompanist Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 }

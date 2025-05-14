@@ -1,6 +1,13 @@
 package com.ssafy.lanterns.ui.screens.mypage
 
 import android.widget.Toast // 토스트 메시지용
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -15,13 +22,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -32,19 +42,27 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.lanterns.R
 import com.ssafy.lanterns.data.model.User
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.*
+import com.ssafy.lanterns.ui.util.getProfileImageByNumber
+import com.ssafy.lanterns.ui.util.getAllProfileImageResources
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.material.ContentAlpha
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
 
 @Composable
 fun MyPageScreen(
     viewModel: MyPageViewModel = hiltViewModel(),
     onNavigateToLogin: () -> Unit,
-    popBackStack: () -> Unit,
     paddingValues: PaddingValues // MainScaffold로부터 전달받는 패딩
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -69,96 +87,125 @@ fun MyPageScreen(
     // 이미지 선택 다이얼로그
     if (showImageSelectionDialog) {
         ProfileImageSelectionDialog(
-            availableImages = uiState.availableProfileImages,
+            availableImageResources = uiState.availableProfileImageResources,
             onDismiss = { showImageSelectionDialog = false },
-            onImageSelected = { selectedResId ->
-                viewModel.updateProfileImage(selectedResId)
+            onImageSelected = { selectedNumber ->
+                viewModel.updateSelectedProfileImageNumber(selectedNumber)
                 showImageSelectionDialog = false
             }
         )
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colors.background)
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(NavyTop, NavyBottom)
+                )
+            )
             .padding(paddingValues) // 하단 네비게이션 바 고려
     ) {
-        // Top Bar
-        Row(
-             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colors.onBackground,
-                modifier = Modifier.size(24.dp).clickable { popBackStack() }
-            )
-            Text(
-                 text = "프로필 수정",
-                color = MaterialTheme.colors.onBackground, fontSize = 25.sp, fontWeight = FontWeight.Normal,
-                letterSpacing = (-0.25).sp
-            )
-            Text(
-                 text = if (uiState.isEditing) "완료" else "수정",
-                color = MaterialTheme.colors.primary, fontSize = 15.sp, fontWeight = FontWeight.Normal,
-                letterSpacing = (-0.15).sp,
-                modifier = Modifier.clickable {
-                    if (uiState.isEditing) viewModel.saveProfileChanges()
-                    else viewModel.toggleEditMode()
-                }
-            )
-        }
-
         // Content Area
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 32.dp)
-                .padding(top = 16.dp),
+                .padding(top = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // 상단 헤더
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "프로필",
+                    color = Color.White,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.25).sp
+                )
+                
+                Button(
+                    onClick = {
+                        if (uiState.isEditing) viewModel.saveProfileChanges()
+                        else viewModel.toggleEditMode()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = if (uiState.isEditing) Color(0xFF1DE9B6) else Color(0xFF1DE9B6).copy(alpha = 0.8f),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.height(40.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = if (uiState.isEditing) "완료" else "수정",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             // Profile Image Section
             Box(contentAlignment = Alignment.Center) {
-                Image(
-                    painter = painterResource(id = uiState.profileImageResId),
-                    contentDescription = "Profile Image",
-                    modifier = Modifier
-                        .size(160.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.disabled))
-                        .clickable(enabled = uiState.isEditing) {
-                            if (uiState.isEditing) {
-                                showImageSelectionDialog = true
-                            }
-                        },
-                    contentScale = ContentScale.Crop
-                )
+                val avatarSize = 180.dp
+                val subtleBorderThickness = 1.dp
 
-                 if (uiState.isEditing) {
-                     Box(
-                         modifier = Modifier
-                             .size(40.dp)
-                             .clip(CircleShape)
-                             .background(MaterialTheme.colors.primary)
-                             .align(Alignment.BottomEnd)
-                             .offset(x = 8.dp, y = 8.dp)
-                             .clickable { showImageSelectionDialog = true }
-                             .zIndex(1f),
-                         contentAlignment = Alignment.Center
-                     ) {
-                         Icon(
-                             imageVector = Icons.Default.Edit,
-                             contentDescription = "Edit Profile Image",
-                             tint = MaterialTheme.colors.onPrimary,
-                             modifier = Modifier.size(20.dp)
-                         )
-                     }
-                 }
+                Box(
+                    modifier = Modifier
+                        .size(avatarSize)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colors.surface.copy(alpha = 0.1f))
+                        .border(
+                            width = subtleBorderThickness,
+                            color = Color.White.copy(alpha = 0.3f),
+                            shape = CircleShape
+                        )
+                ) {
+                    val actualImageResId = getProfileImageByNumber(uiState.selectedProfileImageNumber)
+                    Image(
+                        painter = painterResource(id = actualImageResId),
+                        contentDescription = "Profile Image",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape)
+                            .padding(subtleBorderThickness)
+                            .clickable(enabled = uiState.isEditing) {
+                                if (uiState.isEditing) {
+                                    showImageSelectionDialog = true
+                                }
+                            },
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                if (uiState.isEditing) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1DE9B6))
+                            .align(Alignment.BottomEnd)
+                            .offset(x = 8.dp, y = 8.dp)
+                            .clickable { showImageSelectionDialog = true }
+                            .zIndex(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Profile Image",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -168,7 +215,11 @@ fun MyPageScreen(
                 label = "닉네임",
                 value = uiState.nicknameInput,
                 onValueChange = viewModel::updateNickname,
-                isEditing = uiState.isEditing
+                isEditing = uiState.isEditing,
+                labelColor = Color(0xB3FFFFFF),
+                valueColor = Color(0xE6FFFFFF),
+                underlineIdleColor = Color(0x26FFFFFF),
+                underlineFocusedColor = Color(0xE6FFFFFF)
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -176,23 +227,34 @@ fun MyPageScreen(
             // Email Field
             ProfileDisplayField(
                 label = "이메일",
-                value = uiState.email
+                value = uiState.email,
+                labelColor = Color(0xB3FFFFFF),
+                valueColor = Color(0xE6FFFFFF)
             )
 
             Spacer(modifier = Modifier.weight(1f))
 
             // Log Out Button
+            val logoutButtonInteractionSource = remember { MutableInteractionSource() }
+            val isLogoutButtonPressed by logoutButtonInteractionSource.collectIsPressedAsState()
+            val logoutButtonColor = Color(0xFF1DE9B6)
+
             Button(
                 onClick = { viewModel.logout() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(backgroundColor = MaterialTheme.colors.primary)
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = if (isLogoutButtonPressed) logoutButtonColor.copy(alpha = 0.8f) else logoutButtonColor
+                ),
+                interactionSource = logoutButtonInteractionSource
             ) {
                 Text(
                     text = "로그아웃",
-                    fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colors.onPrimary
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
                 )
             }
 
@@ -201,9 +263,14 @@ fun MyPageScreen(
 
         // 로딩 인디케이터
         if (uiState.isLoading) {
-             Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colors.background.copy(alpha=0.5f)), contentAlignment = Alignment.Center) {
-                 CircularProgressIndicator(color = MaterialTheme.colors.primary)
-             }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colors.background.copy(alpha = 0.7f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colors.primary)
+            }
         }
     }
 }
@@ -214,47 +281,51 @@ fun ProfileEditField(
     value: String,
     onValueChange: (String) -> Unit,
     isEditing: Boolean,
-    modifier: Modifier = Modifier
+    labelColor: Color = Color.White.copy(alpha = ContentAlpha.medium),
+    valueColor: Color = Color.White,
+    underlineIdleColor: Color = Color.White.copy(alpha = 0.3f),
+    underlineFocusedColor: Color = Color.White
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
+            color = labelColor,
             fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colors.onBackground
+            fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(8.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(IntrinsicSize.Min)
-        ) {
-            Text(
-                text = value.ifEmpty { " " },
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colors.onBackground,
-                modifier = Modifier.alpha(if (isEditing) 0f else 1f)
-            )
-            if (isEditing) {
-                BasicTextField(
-                    value = value,
-                    onValueChange = onValueChange,
-                    textStyle = TextStyle(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colors.onBackground
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    cursorBrush = SolidColor(MaterialTheme.colors.primary)
-                )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = isEditing,
+            textStyle = TextStyle(
+                color = if (isEditing) valueColor else valueColor.copy(alpha = ContentAlpha.disabled),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            ),
+            cursorBrush = SolidColor(valueColor),
+            modifier = Modifier.fillMaxWidth(),
+            interactionSource = interactionSource,
+            decorationBox = { innerTextField ->
+                Box {
+                    innerTextField()
+                    if (value.isEmpty() && isEditing) {
+                        Text(
+                            text = "닉네임을 입력하세요",
+                            color = valueColor.copy(alpha = ContentAlpha.medium),
+                            fontSize = 18.sp
+                        )
+                    }
+                }
             }
-        }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
         Divider(
-            color = MaterialTheme.colors.onBackground,
-            thickness = 1.dp,
-            modifier = Modifier.padding(top = 4.dp)
+            color = if (isFocused && isEditing) underlineFocusedColor else underlineIdleColor,
+            thickness = if (isFocused && isEditing) 2.dp else 1.dp
         )
     }
 }
@@ -263,65 +334,130 @@ fun ProfileEditField(
 fun ProfileDisplayField(
     label: String,
     value: String,
-    modifier: Modifier = Modifier
+    labelColor: Color = Color.White.copy(alpha = ContentAlpha.medium),
+    valueColor: Color = Color.White
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
+            color = labelColor,
             fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colors.onBackground
+            fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colors.onBackground.copy(alpha = ContentAlpha.medium)
+            color = valueColor,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold
         )
-        Divider(
-            color = MaterialTheme.colors.onBackground,
-            thickness = 1.dp,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Divider(color = Color.White.copy(alpha = 0.2f), thickness = 1.dp)
     }
 }
 
 @Composable
 fun ProfileImageSelectionDialog(
-    availableImages: List<Int>,
+    availableImageResources: Map<Int, Int>,
     onDismiss: () -> Unit,
     onImageSelected: (Int) -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colors.surface
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        AnimatedVisibility(
+            visible = true,
+            enter = fadeIn(animationSpec = tween(300)) + 
+                   slideInVertically(
+                       animationSpec = tween(300, easing = FastOutSlowInEasing),
+                       initialOffsetY = { it / 2 }
+                   ),
+            exit = fadeOut(animationSpec = tween(300)) +
+                   slideOutVertically(
+                       animationSpec = tween(300, easing = FastOutSlowInEasing),
+                       targetOffsetY = { it / 2 }
+                   )
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("프로필 이미지 선택", fontSize = 20.sp, color = MaterialTheme.colors.onSurface, modifier = Modifier.padding(bottom = 16.dp))
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 80.dp),
-                    contentPadding = PaddingValues(4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = NavyTop.copy(alpha = 0.95f),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Color(0xFF1DE9B6)
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(availableImages) { imageResId ->
-                        Image(
-                            painter = painterResource(id = imageResId),
-                            contentDescription = "Profile Option $imageResId",
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .clickable { onImageSelected(imageResId) }
-                                .border(BorderStroke(1.dp, MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.disabled)), CircleShape),
-                            contentScale = ContentScale.Crop
+                    Text(
+                        "프로필 이미지 선택",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(bottom = 20.dp)
+                    )
+                    
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier
+                            .heightIn(max = 300.dp)
+                            .padding(8.dp)
+                    ) {
+                        items(availableImageResources.entries.toList()) { entry ->
+                            val number = entry.key
+                            val imageResId = entry.value
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(CircleShape)
+                                    .border(
+                                        BorderStroke(
+                                            2.dp,
+                                            Color(0xFF1DE9B6)
+                                        ),
+                                        CircleShape
+                                    )
+                                    .clickable { onImageSelected(number) },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = imageResId),
+                                    contentDescription = "Profile Option $number",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color(0xFF1DE9B6)
+                        )
+                    ) {
+                        Text(
+                            "취소",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("취소")
                 }
             }
         }
@@ -332,89 +468,175 @@ fun ProfileImageSelectionDialog(
 @Composable
 fun MyPageScreenPreview() {
     LanternTheme {
-         // FIXME: 아래 User 객체 생성은 실제 data/model/User.kt 정의와 일치해야 합니다.
-         //        현재는 컴파일 오류를 피하기 위해 임의의 값을 사용하고 있습니다.
          val previewUser = User(
-             userId = 0L, // FIXME: String 타입 오류 -> 임시로 Long 타입 0L 전달. 실제 타입 확인 필요.
+             userId = 0L, 
              nickname = "@previewUser",
-             deviceId = "preview_device_id", // FIXME: 누락된 파라미터 -> 임시로 문자열 전달. 실제 타입 확인 필요.
-             // --- 아래 필드들은 실제 User 모델에 정의되어 있는지 확인하고, 타입에 맞춰 주석 해제 또는 수정 필요 --- 
-             // email = "preview@example.com",
-             // name = "프리뷰",
-             // profileImageResId = R.drawable.lantern_image,
+             deviceId = "preview_device_id",
+             selectedProfileImageNumber = 1
          )
          val previewUiState = MyPageUiState(
              user = previewUser,
              nicknameInput = "@previewUser",
-             profileImageResId = R.drawable.lantern_image,
-             availableProfileImages = defaultProfileImages
+             selectedProfileImageNumber = 1,
+             availableProfileImageResources = getAllProfileImageResources()
          )
          val isEditing = remember { mutableStateOf(false) }
-         var currentImage by remember { mutableStateOf(previewUiState.profileImageResId) }
+         var currentImageNumber by remember { mutableStateOf(previewUiState.selectedProfileImageNumber) }
          var currentNickname by remember { mutableStateOf(previewUiState.nicknameInput)}
          var showDialog by remember { mutableStateOf(false) }
 
         if(showDialog) {
              ProfileImageSelectionDialog(
-                 availableImages = previewUiState.availableProfileImages,
+                 availableImageResources = previewUiState.availableProfileImageResources,
                  onDismiss = { showDialog = false },
-                 onImageSelected = { currentImage = it; showDialog = false} )
+                 onImageSelected = { selectedNumber -> 
+                     currentImageNumber = selectedNumber
+                     showDialog = false
+                 }
+             )
         }
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colors.background)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(NavyTop, NavyBottom)
+                    )
+                )
         ) {
-             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.ArrowBack, "Back", tint=MaterialTheme.colors.onBackground, modifier = Modifier.clickable { })
-                Text("프로필 수정", color = MaterialTheme.colors.onBackground, fontSize = 25.sp)
-                Text(if (isEditing.value) "완료" else "수정", color = MaterialTheme.colors.primary, fontSize = 15.sp, modifier = Modifier.clickable { isEditing.value = !isEditing.value })
-            }
              Column(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                 Box(contentAlignment = Alignment.Center) {
-                     Image(
-                         painterResource(id = currentImage), "", // 기본값 사용
-                         modifier = Modifier.size(160.dp).clip(CircleShape).clickable(enabled = isEditing.value) { if(isEditing.value) showDialog = true },
-                         contentScale = ContentScale.Crop
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .padding(horizontal = 32.dp, vertical = 24.dp),
+                 horizontalAlignment = Alignment.CenterHorizontally
+             ) {
+                 // 상단 헤더
+                 Row(
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(bottom = 24.dp),
+                     horizontalArrangement = Arrangement.SpaceBetween,
+                     verticalAlignment = Alignment.CenterVertically
+                 ) {
+                     Text(
+                         text = "프로필",
+                         color = Color.White,
+                         fontSize = 25.sp,
+                         fontWeight = FontWeight.Bold,
+                         letterSpacing = (-0.25).sp
                      )
-                     if (isEditing.value) {
-                          Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colors.primary)
-                                    .align(Alignment.BottomEnd)
-                                    .offset(x = 8.dp, y = 8.dp)
-                                    .clickable { showDialog = true }
-                                    .zIndex(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.Edit, "", tint = MaterialTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
-                            }
-                      }
+                     
+                     Button(
+                         onClick = { isEditing.value = !isEditing.value },
+                         colors = ButtonDefaults.buttonColors(
+                             backgroundColor = if (isEditing.value) MaterialTheme.colors.primary 
+                                 else MaterialTheme.colors.primaryVariant.copy(alpha = 0.7f),
+                             contentColor = Color.White
+                         ),
+                         shape = RoundedCornerShape(20.dp),
+                         modifier = Modifier.height(40.dp)
+                     ) {
+                         Text(
+                             text = if (isEditing.value) "완료" else "수정",
+                             fontSize = 16.sp,
+                             fontWeight = FontWeight.Bold
+                         )
+                     }
                  }
-                Spacer(modifier = Modifier.height(48.dp))
-                ProfileEditField("닉네임", currentNickname, { currentNickname = it }, isEditing.value)
-                Spacer(modifier = Modifier.height(24.dp))
-                // FIXME: User 모델에 email 필드가 정의되면 아래 코드로 대체해야 합니다.
-                // ProfileDisplayField("이메일", previewUser.email ?: "이메일 정보 없음")
-                ProfileDisplayField("이메일", "이메일 정보 없음 (임시)")
-                Spacer(modifier = Modifier.weight(1f))
-                Button(onClick = { }, modifier = Modifier.fillMaxWidth().height(60.dp), shape=RoundedCornerShape(20.dp), colors = ButtonDefaults.buttonColors(MaterialTheme.colors.primary)) {
-                    Text("로그아웃", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colors.onPrimary)
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-            }
+                 
+                 Spacer(modifier = Modifier.height(32.dp))
+                 
+                 // 프로필 이미지
+                 Box(contentAlignment = Alignment.Center) {
+                     Box(
+                         modifier = Modifier
+                             .size(160.dp)
+                             .clip(CircleShape)
+                             .background(MaterialTheme.colors.surface.copy(alpha = 0.2f))
+                             .border(
+                                 width = 2.dp,
+                                 brush = Brush.linearGradient(
+                                     colors = listOf(MaterialTheme.colors.primary, MaterialTheme.colors.primaryVariant)
+                                 ),
+                                 shape = CircleShape
+                             )
+                     ) {
+                         val actualImageResId = getProfileImageByNumber(currentImageNumber)
+                         Image(
+                             painter = painterResource(id = actualImageResId),
+                             contentDescription = "Profile Image",
+                             modifier = Modifier
+                                 .fillMaxSize()
+                                 .clip(CircleShape)
+                                 .clickable(enabled = isEditing.value) { 
+                                     if(isEditing.value) showDialog = true 
+                                 },
+                             contentScale = ContentScale.Crop
+                         )
+                     }
+                     
+                     if (isEditing.value) {
+                         Box(
+                             modifier = Modifier
+                                 .size(50.dp)
+                                 .clip(CircleShape)
+                                 .background(Color(0xFF1DE9B6))
+                                 .align(Alignment.BottomEnd)
+                                 .offset(x = 8.dp, y = 8.dp)
+                                 .clickable { showDialog = true }
+                                 .zIndex(1f),
+                             contentAlignment = Alignment.Center
+                         ) {
+                             Icon(
+                                 imageVector = Icons.Default.Edit,
+                                 contentDescription = "Edit Profile Image",
+                                 tint = Color.White,
+                                 modifier = Modifier.size(24.dp)
+                             )
+                         }
+                     }
+                 }
+                 
+                 Spacer(modifier = Modifier.height(48.dp))
+                 
+                 // 닉네임 필드
+                 ProfileEditField(
+                     label = "닉네임",
+                     value = currentNickname,
+                     onValueChange = { currentNickname = it },
+                     isEditing = isEditing.value
+                 )
+                 
+                 Spacer(modifier = Modifier.height(24.dp))
+                 
+                 // 이메일 필드
+                 ProfileDisplayField(
+                     label = "이메일",
+                     value = "이메일 정보 없음 (임시)"
+                 )
+                 
+                 Spacer(modifier = Modifier.weight(1f))
+                 
+                 // 로그아웃 버튼
+                 Button(
+                     onClick = { },
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .height(60.dp),
+                     shape = RoundedCornerShape(20.dp),
+                     colors = ButtonDefaults.buttonColors(
+                         backgroundColor = MaterialTheme.colors.primary
+                     )
+                 ) {
+                     Text(
+                         text = "로그아웃",
+                         fontSize = 20.sp,
+                         fontWeight = FontWeight.SemiBold,
+                         color = Color.White
+                     )
+                 }
+             }
         }
     }
 }
