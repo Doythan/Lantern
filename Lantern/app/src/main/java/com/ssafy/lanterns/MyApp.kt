@@ -2,8 +2,11 @@
 package com.ssafy.lanterns
 
 import android.app.Application
+import android.content.Intent
+import android.os.Build
 import androidx.room.Room
 import com.ssafy.lanterns.data.database.AppDatabase
+import com.ssafy.lanterns.service.WakeWordService
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -20,6 +23,12 @@ class MyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // db 초기화는 by lazy 블록에서 이루어집니다.
+        Intent(this, WakeWordService::class.java).also { intent ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent) // API 26 이상에서는 foreground service로 시작
+            } else {
+                startService(intent)
+            }
+        }
     }
 }

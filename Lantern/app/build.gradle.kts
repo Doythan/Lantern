@@ -155,4 +155,6 @@ dependencies {
     // Accompanist Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
+    implementation("ai.picovoice:porcupine-android:3.0.1")
+
 }
