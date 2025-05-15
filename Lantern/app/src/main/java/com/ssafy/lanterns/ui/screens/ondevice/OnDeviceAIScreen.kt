@@ -90,12 +90,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.app.Activity
 import android.os.Build
+import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -154,6 +156,7 @@ fun VoiceModal(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.8f))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null // 클릭 시 시각적 효과 제거
@@ -678,13 +681,27 @@ fun OnDeviceAIScreen(
         if (isGranted) {
             viewModel.activateAI()
         } else {
-            viewModel.showError("음성 인식을 위해 마이크 권한이 필요합니다")
+            viewModel.showErrorAndPrepareToClose("음성 인식을 위해 마이크 권한이 필요합니다") // 수정된 코드
             Toast.makeText(context, "마이크 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+
         }
     }
+
+    val previousAiState = remember { mutableStateOf(uiState.currentAiState) }
     
     LaunchedEffect(key1 = Unit) {
         checkPermissionAndActivateAI(context, viewModel, permissionLauncher)
+    }
+
+    LaunchedEffect(uiState.currentAiState) {
+        Log.d("OnDeviceAIScreen", "LaunchedEffect 실행. 현재 상태: ${uiState.currentAiState}, 이전 상태: ${previousAiState.value}")
+        // 이전 상태가 LISTENING 또는 다른 활성 상태였고, 현재 상태가 IDLE로 "변경"되었을 때만 onDismiss 호출
+        if (previousAiState.value != AiState.IDLE && uiState.currentAiState == AiState.IDLE) {
+            Log.d("OnDeviceAIScreen", "AI 상태가 IDLE로 '변경'됨. 화면 닫기 요청. 이전 상태: ${previousAiState.value}")
+            onDismiss()
+        }
+        // 현재 상태를 이전 상태로 업데이트
+        previousAiState.value = uiState.currentAiState
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "BackgroundTransition")
