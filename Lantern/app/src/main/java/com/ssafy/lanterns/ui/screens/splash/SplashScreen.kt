@@ -24,13 +24,18 @@ import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.ssafy.lanterns.ui.theme.NavyBottom // 다크 네이비 배경색
 import com.ssafy.lanterns.ui.theme.TextWhite // 텍스트 및 글로우 색상
+import com.ssafy.lanterns.utils.PreferenceUtil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun SplashScreen(onTimeout: () -> Unit) {
+fun SplashScreen(
+    // 로그인 상태를 반환하는 콜백으로 변경
+    onTimeout: (isLoggedIn: Boolean) -> Unit
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
+    val preferenceUtil = remember { PreferenceUtil(context) }
 
     // 애니메이션 상태 변수들
     val glowAlpha = remember { Animatable(0f) } // 중앙 점광원 밝기 (0.0f to 0.4f)
@@ -100,7 +105,11 @@ fun SplashScreen(onTimeout: () -> Unit) {
         // 4. 전체 스플래시 종료 및 화면 전환
         // 가장 긴 애니메이션은 글로우 림이므로 1600ms 후 종료.
         delay(1600)
-        onTimeout()
+        
+        // 로그인 상태 확인 후 콜백 호출
+        val token = preferenceUtil.getString("token", "")
+        val isLoggedIn = token.isNotEmpty()
+        onTimeout(isLoggedIn)
     }
 
     Box(

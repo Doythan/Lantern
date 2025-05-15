@@ -16,6 +16,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -30,7 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -40,6 +44,8 @@ import androidx.navigation.compose.rememberNavController
 import com.ssafy.lanterns.ui.screens.main.components.AnimationValues
 import com.ssafy.lanterns.ui.screens.main.components.MainContent
 import com.ssafy.lanterns.ui.screens.main.components.RippleState
+import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIDialog
+import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIViewModel
 import com.ssafy.lanterns.ui.theme.LanternTheme
 import com.ssafy.lanterns.ui.theme.NavyBottom
 import com.ssafy.lanterns.ui.theme.NavyTop
@@ -49,6 +55,7 @@ import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import android.content.Context
+import com.ssafy.lanterns.ui.navigation.AppDestinations
 
 /**
  * 메인 화면
@@ -68,6 +75,7 @@ fun MainScreen(
 ) {
     // ViewModel로부터 UI 상태 수집
     val uiState by viewModel.uiState.collectAsState()
+    val aiActive by viewModel.aiActive.collectAsState()
     
     // 코루틴 스코프
     val coroutineScope = rememberCoroutineScope()
@@ -78,9 +86,7 @@ fun MainScreen(
     val rippleAnimatable2 = remember { Animatable(0f) }
     val rippleAnimatable3 = remember { Animatable(0f) }
     
-    // 생명주기 관찰자
-    // TODO: [Deprecated API] LocalLifecycleOwner는 lifecycle-runtime-compose 라이브러리의 androidx.lifecycle.compose 패키지로 이동되었습니다.
-    // 추후 업데이트 시 androidx.lifecycle.compose.LocalLifecycleOwner로 교체 필요
+    // 생명주기 관찰자 - 업데이트된 패키지 사용
     val lifecycleOwner = LocalLifecycleOwner.current
     // TODO: context 변수는 BLE 로직 구현 시 사용될 예정입니다.
     @Suppress("UNUSED_VARIABLE")
@@ -249,6 +255,23 @@ fun MainScreen(
                 .then(modifier),
             contentAlignment = Alignment.Center
         ) {
+            // AI 호출 버튼
+            FloatingActionButton(
+                onClick = { 
+                    // 라우트 이동 대신 AI 활성화 함수 호출
+                    viewModel.activateAI()
+                },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp),
+                containerColor = MaterialTheme.colorScheme.primary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Voice AI"
+                )
+            }
+            
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
                 isScanning = uiState.isScanning,
@@ -299,6 +322,13 @@ fun MainScreen(
                 subTextVisible = uiState.subTextVisible,
                 showListButton = uiState.showListButton
             )
+            
+            // AI 대화상자 표시 - OnDeviceAIScreen 대신 OnDeviceAIDialog 사용
+            if (aiActive) {
+                OnDeviceAIDialog(
+                    onDismiss = { viewModel.deactivateAI() }
+                )
+            }
         }
     }
 }
@@ -424,7 +454,9 @@ fun MainScreen(
 @Composable
 fun MainScreenPreview() {
     LanternTheme {
-        MainScreen(navController = rememberNavController())
+        Surface {
+            MainScreen(navController = rememberNavController())
+        }
     }
 }
 

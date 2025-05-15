@@ -27,6 +27,7 @@ class MainActivity : ComponentActivity() {
                 Surface(
                     modifier = Modifier.fillMaxSize()
                 ) {
+                    // App() 대신 직접 AppNavigation()을 호출하여 시작 화면을 표시합니다.
                     AppNavigation()
                 }
             }
