@@ -65,7 +65,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
-        freeCompilerArgs += listOf("-Xjvm-default=all")
+        freeCompilerArgs += listOf(
+            "-Xjvm-default=all",
+            "-opt-in=androidx.media3.common.util.UnstableApi"
+        )
     }
 
     buildFeatures {
@@ -134,6 +137,9 @@ dependencies {
 
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    
+    // Lifecycle Runtime Compose - LocalLifecycleOwner 지원
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
@@ -148,4 +154,5 @@ dependencies {
 
     // Accompanist Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+
 }

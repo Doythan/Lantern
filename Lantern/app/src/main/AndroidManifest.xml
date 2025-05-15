@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 네트워크 상태 확인 권한 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 음성 인식 권한 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:name=".MyApp"

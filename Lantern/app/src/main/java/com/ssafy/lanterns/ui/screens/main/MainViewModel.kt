@@ -31,7 +31,10 @@ data class MainScreenState(
     val isBleServiceActive: Boolean = false,
     
     // 프로필 화면 이동을 위한 userId 상태
-    val navigateToProfile: String? = null
+    val navigateToProfile: String? = null,
+
+    // AI 관련 상태 추가
+    val showOnDeviceAI: Boolean = false
 )
 
 @HiltViewModel
@@ -44,8 +47,26 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainScreenState())
     val uiState: StateFlow<MainScreenState> = _uiState.asStateFlow()
     
+    // AI 상태 관리
+    private val _aiActive = MutableStateFlow(false)
+    val aiActive: StateFlow<Boolean> = _aiActive.asStateFlow()
+    
     // 스캔 작업을 처리하는 Job
     private var scanningJob: Job? = null
+    
+    /**
+     * AI 화면을 활성화합니다.
+     */
+    fun activateAI() {
+        _aiActive.value = true
+    }
+
+    /**
+     * AI 화면을 비활성화합니다.
+     */
+    fun deactivateAI() {
+        _aiActive.value = false
+    }
     
     /**
      * 스캔 상태를 토글합니다.
