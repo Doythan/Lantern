@@ -34,21 +34,21 @@ fun PersonDot(
     // 신호 강도에 따라 색상 결정
     val dotColor = getConnectionColorByDistance(distance)
     
-    // 더 작은 고정 크기 설정
-    val baseSize = 8.dp
+    // 더 큰 크기로 설정 (기존 8dp → 12dp)
+    val baseSize = 12.dp
     
     Box(
         modifier = modifier
     ) {
-        // 빛나는 효과 (반짝이는 효과만 유지)
+        // 빛나는 효과 (반짝이는 효과 강화)
         Box(
             modifier = Modifier
-                .size(baseSize * 2.5f)
-                .alpha(glowAlpha * signalStrength)
+                .size(baseSize * 3.0f) // 발광 영역 확대
+                .alpha(glowAlpha * signalStrength * 1.2f) // 밝기 약간 증가
                 .background(
                     brush = Brush.radialGradient(
                         colors = listOf(
-                            dotColor.copy(alpha = 0.7f),
+                            dotColor.copy(alpha = 0.8f), // 중앙 색상 더 진하게
                             dotColor.copy(alpha = 0.0f)
                         )
                     ),
@@ -56,12 +56,12 @@ fun PersonDot(
                 )
         )
         
-        // 중앙 점 (크기 축소)
+        // 중앙 점 (크기 증가)
         Box(
             modifier = Modifier
                 .size(baseSize)
                 .align(Alignment.Center)
-                .shadow(4.dp, CircleShape)
+                .shadow(6.dp, CircleShape) // 그림자 강화
                 .clip(CircleShape)
                 .background(
                     brush = Brush.radialGradient(
@@ -69,19 +69,19 @@ fun PersonDot(
                         radius = baseSize.value * 0.8f
                     )
                 )
-                .border(0.5.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                .border(1.0.dp, Color.White.copy(alpha = 0.9f), CircleShape) // 테두리 두껍게
         )
         
-        // 단순한 반짝임 효과 (기존 복잡한 맥동 효과 대체)
+        // 반짝임 효과 강화
         Box(
             modifier = Modifier
-                .size(baseSize * 1.6f)
+                .size(baseSize * 2.0f) // 크기 증가
                 .scale(pulseScale)
                 .align(Alignment.Center)
-                .alpha(0.5f * signalStrength)
+                .alpha(0.6f * signalStrength) // 투명도 감소로 더 밝게
                 .border(
-                    width = 1.1.dp,
-                    color = dotColor.copy(alpha = 0.7f),
+                    width = 1.5.dp, // 테두리 두껍게
+                    color = dotColor.copy(alpha = 0.8f), // 색상 더 진하게
                     shape = CircleShape
                 )
         )

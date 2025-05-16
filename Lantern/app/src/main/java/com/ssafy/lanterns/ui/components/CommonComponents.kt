@@ -3,17 +3,24 @@ package com.ssafy.lanterns.ui.components
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -22,12 +29,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.ssafy.lanterns.ui.theme.BleBlue1
-import com.ssafy.lanterns.ui.util.getProfileImageResId
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.layout.Column
-import com.ssafy.lanterns.ui.theme.LanternTheme
-import com.ssafy.lanterns.ui.theme.ConnectionNear
+import com.ssafy.lanterns.ui.theme.*
+import com.ssafy.lanterns.ui.util.getProfileImageResId
 
 /**
  * 앱 전체에서 사용될 수 있는 공통 검색 바
@@ -39,24 +43,53 @@ fun CommonSearchBar(
     placeholderText: String = "검색",
     modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
+    androidx.compose.material3.TextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text(placeholderText, color = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium)) },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Search Icon", tint = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium)) },
+        placeholder = {
+            Text(
+                text = placeholderText,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = "Search Icon",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Clear, 
+                        contentDescription = "Clear",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp) // 패딩 조정 (기존 FriendListScreen 기준)
-            .height(48.dp),
-        shape = RoundedCornerShape(50), // 둥근 모서리
-        colors = TextFieldDefaults.outlinedTextFieldColors(
-            backgroundColor = Color(0xFF232323), // FriendListScreen과 통일된 배경색
-            unfocusedBorderColor = Color.Transparent,
-            focusedBorderColor = Color.Transparent,
-            textColor = MaterialTheme.colors.onSurface,
-            cursorColor = MaterialTheme.colors.primary,
-            leadingIconColor = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium),
-            placeholderColor = MaterialTheme.colors.onSurface.copy(alpha = ContentAlpha.medium)
+            .padding(horizontal = 16.dp, vertical = 8.dp) 
+            .height(56.dp), 
+        shape = CircleShape, 
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = SurfaceLight, 
+            unfocusedContainerColor = SurfaceLight,
+            disabledContainerColor = SurfaceLight.copy(alpha = 0.5f),
+            cursorColor = MaterialTheme.colorScheme.primary,
+            focusedIndicatorColor = Color.Transparent, 
+            unfocusedIndicatorColor = Color.Transparent, 
+            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+            focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         singleLine = true
     )
@@ -66,85 +99,108 @@ fun CommonSearchBar(
  * 공통 프로필 아바타 컴포넌트
  * 
  * @param profileId 프로필 이미지 ID (getProfileImageResId 함수와 함께 사용)
+ * @param name 프로필 이름 (선택 사항)
  * @param size 아바타 크기 (기본 48dp)
  * @param modifier 추가 모디파이어 
  * @param borderColor 경계선 색상 (hasBorder가 true일 때 사용)
+ * @param borderGradientEnd 경계선 그라데이션 색상 (hasBorder가 true일 때 사용)
  * @param hasBorder 경계선 표시 여부
  * @param onClick 클릭 이벤트 처리 (선택 사항)
  */
 @Composable
 fun ProfileAvatar(
     profileId: Int,
+    name: String? = "Profile Avatar",
     size: Dp = 48.dp,
     modifier: Modifier = Modifier,
-    borderColor: Color = Color.Transparent,
+    borderColor: Color = MaterialTheme.colorScheme.primary, 
+    borderGradientEnd: Color = MaterialTheme.colorScheme.secondary, 
     hasBorder: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
-    if (hasBorder) {
-        // 경계선이 있는 프로필 아바타
-        androidx.compose.foundation.layout.Box(
-            modifier = modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            borderColor,
-                            BleBlue1
+    val imageModifier = Modifier
+        .size(size)
+        .clip(CircleShape)
+        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+
+    Box(
+        modifier = modifier.then(
+            if (hasBorder) {
+                imageModifier
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(borderColor, borderGradientEnd)
                         )
                     )
-                )
-                .padding(2.dp)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-        ) {
-            Image(
-                painter = painterResource(id = getProfileImageResId(profileId)),
-                contentDescription = "Profile Avatar",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
-            )
-        }
-    } else {
-        // 경계선이 없는 기본 프로필 아바타
+                    .padding(2.dp) 
+                    .background(MaterialTheme.colorScheme.surface) 
+                    .clip(CircleShape) 
+            } else {
+                imageModifier.background(MaterialTheme.colorScheme.surface) 
+            }
+        )
+    ) {
         Image(
             painter = painterResource(id = getProfileImageResId(profileId)),
-            contentDescription = "Profile Avatar",
-            modifier = modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(MaterialTheme.colors.surface)
-                .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+            contentDescription = name ?: "Profile image for ID $profileId", 
+            modifier = Modifier.fillMaxSize().clip(CircleShape), 
             contentScale = ContentScale.Crop
         )
     }
 }
 
-@Preview
+@Preview(showBackground = true)
+@Composable
+fun CommonSearchBarPreview() {
+    LanternsTheme {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.padding(16.dp)) {
+            var text by remember { mutableStateOf("") }
+            CommonSearchBar(value = text, onValueChange = { text = it })
+        }
+    }
+}
+
+@Preview(showBackground = true)
 @Composable
 fun ProfileAvatarPreview() {
-    LanternTheme {
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .background(Color(0xFF051225))
-        ) {
-            // 기본 프로필 아바타
-            ProfileAvatar(
-                profileId = 1,
-                size = 48.dp
-            )
-            
-            // 경계선이 있는 프로필 아바타
-            ProfileAvatar(
-                profileId = 2,
-                size = 48.dp,
-                borderColor = ConnectionNear,
-                hasBorder = true,
-                modifier = Modifier.padding(top = 16.dp)
-            )
+    LanternsTheme {
+        Surface(color = MaterialTheme.colorScheme.background) { 
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+            ) {
+                Text("기본 프로필 아바타 (테두리 없음):", style = MaterialTheme.typography.labelMedium, color=MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(8.dp))
+                ProfileAvatar(
+                    profileId = 1,
+                    name = "김싸피",
+                    size = 60.dp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("테두리 있는 프로필 아바타 (기본 그라데이션):", style = MaterialTheme.typography.labelMedium, color=MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(8.dp))
+                ProfileAvatar(
+                    profileId = 2,
+                    name = "이랜턴",
+                    size = 60.dp,
+                    hasBorder = true
+                    // modifier = Modifier.padding(top = 8.dp) // 이 패딩은 Box에 적용, Column 패딩으로 관리하는 것이 좋음
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("테두리 있는 프로필 아바타 (커스텀 테두리 색상):", style = MaterialTheme.typography.labelMedium, color=MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.height(8.dp))
+                ProfileAvatar(
+                    profileId = 3,
+                    name = "박테마",
+                    size = 60.dp,
+                    borderColor = ConnectionNear, 
+                    borderGradientEnd = LanternTeal, 
+                    hasBorder = true
+                    // modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 } 

@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,11 +43,7 @@ fun IncomingCallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(NavyTop, NavyBottom)
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -86,7 +83,7 @@ fun IncomingCallScreen(
                 // 발신자 이름
                 Text(
                     text = callerName,
-                    color = TextWhite,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -96,7 +93,7 @@ fun IncomingCallScreen(
                 // "전화가 왔습니다" 텍스트
                 Text(
                     text = "전화가 왔습니다",
-                    color = TextWhite70,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     fontSize = 18.sp
                 )
             }
@@ -124,7 +121,7 @@ fun IncomingCallScreen(
                         Icon(
                             imageVector = Icons.Filled.CallEnd,
                             contentDescription = "거절",
-                            tint = TextWhite,
+                            tint = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -133,7 +130,7 @@ fun IncomingCallScreen(
                     
                     Text(
                         text = "거절",
-                        color = TextWhite,
+                        color = MaterialTheme.colorScheme.onBackground,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -145,7 +142,7 @@ fun IncomingCallScreen(
                     Button(
                         onClick = onAcceptClick,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Primary
+                            containerColor = LanternYellow
                         ),
                         shape = CircleShape,
                         modifier = Modifier.size(64.dp),
@@ -154,7 +151,7 @@ fun IncomingCallScreen(
                         Icon(
                             imageVector = Icons.Filled.Call,
                             contentDescription = "수락",
-                            tint = TextWhite,
+                            tint = Color.Black,
                             modifier = Modifier.size(32.dp)
                         )
                     }
@@ -163,7 +160,7 @@ fun IncomingCallScreen(
                     
                     Text(
                         text = "수락",
-                        color = TextWhite,
+                        color = MaterialTheme.colorScheme.onBackground,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -175,17 +172,12 @@ fun IncomingCallScreen(
 @Preview(showBackground = true)
 @Composable
 fun IncomingCallScreenPreview() {
-    LanternTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = DarkBackground
-        ) {
-            IncomingCallScreen(
-                callerName = "김민수",
-                callerId = 2,
-                onRejectClick = {},
-                onAcceptClick = {}
-            )
-        }
+    LanternsTheme {
+        IncomingCallScreen(
+            callerName = "김민수",
+            callerId = 2,
+            onRejectClick = {},
+            onAcceptClick = {}
+        )
     }
 }

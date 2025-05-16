@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,13 +51,15 @@ import com.ssafy.lanterns.ui.components.ChatMessageBubble
 import com.ssafy.lanterns.ui.components.ChatUser
 import com.ssafy.lanterns.ui.components.NearbyUsersModal
 import com.ssafy.lanterns.ui.theme.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // 메시지 데이터 모델
-data class Message(
+data class ChatMessage(
     val id: Int,
     val sender: String,
     val text: String,
-    val time: String,
+    val time: Long,
     val isMe: Boolean = false,
     val senderProfileId: Int? = null,
     val distance: Float = 50f // 거리 기반으로 변경 (미터 단위)
@@ -95,222 +98,233 @@ data class Message(
 @Composable
 fun PublicChatScreen(
     navController: NavController,
-    paddingValues: PaddingValues = PaddingValues(0.dp)
+    paddingValues: PaddingValues = PaddingValues()
 ) {
-    // 초기 메시지 목록
-    val messages = remember {
-        mutableStateListOf(
-            Message(1, "도경원", "안녕. 나는 도경원이야.", "10:21 PM", true, senderProfileId = 1, distance = 0f),
-            Message(2, "도경원2", "엥. 나도 도경원인데? 너 누구야?? ㅡㅡ", "10:21 PM", false, senderProfileId = 2, distance = 50f),
-            Message(3, "도경원", "내가 진짜 도경원이어야", "10:22 PM", true, senderProfileId = 1, distance = 0f),
-            Message(4, "여자친구", "너희 둘 도대체 뭐하는 거야?", "10:23 PM", false, senderProfileId = 3, distance = 250f),
-            Message(5, "도경원2", "머피떼이뢰!", "10:24 PM", false, senderProfileId = 2, distance = 50f)
-        )
-    }
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val shouldShowScrollToBottom by remember { derivedStateOf { listState.firstVisibleItemIndex > 3 } }
+    var showUsersModal by remember { mutableStateOf(false) }
+    var messageInput by remember { mutableStateOf("") }
     
-    // 주변 사용자 목록
+    // 메시지 전송 가능 상태 (딜레이를 위한 상태 추가)
+    var canSendMessage by remember { mutableStateOf(true) }
+    
     val nearbyUsers = remember {
         listOf(
-            ChatUser(1, "도경원", 0f, 3f),
-            ChatUser(2, "도경원2", 50f, 5f),
-            ChatUser(3, "여자친구", 250f, 12f),
-            ChatUser(4, "친구1", 75f, 4f),
-            ChatUser(5, "친구2", 350f, 15f)
+            ChatUser(1, "김싸피", 80f, 5f),
+            ChatUser(2, "이테마", 150f, 10f),
+            ChatUser(3, "박비트", 250f, 3f),
+            ChatUser(4, "최앱", 300f, 7f),
+            ChatUser(5, "정리액트", 350f, 2f),
+            ChatUser(6, "한고민", 400f, 8f)
         )
     }
     
-    // 상태 변수
-    var messageInput by remember { mutableStateOf("") }
-    var showUsersModal by remember { mutableStateOf(false) }
+    var messages by remember {
+        mutableStateOf(
+            listOf(
+                ChatMessage(1, "시스템", "모두의 광장에 오신 것을 환영합니다. 주변 사람들과 자유롭게 대화해보세요!", System.currentTimeMillis() - 3600000, false),
+                ChatMessage(2, "김싸피", "안녕하세요! 반갑습니다~ 오늘 날씨가 정말 좋네요", System.currentTimeMillis() - 1800000, false),
+                ChatMessage(3, "이테마", "네 맞아요! 오늘 같은 날은 산책하기 좋을 것 같아요", System.currentTimeMillis() - 1500000, false),
+                ChatMessage(4, "박비트", "저는 지금 카페에서 코딩하고 있어요 ☕", System.currentTimeMillis() - 1200000, false),
+                ChatMessage(5, "최앱", "와~ 저도 노트북 들고 카페 가려고 했는데! 어느 카페인가요?", System.currentTimeMillis() - 900000, false),
+                ChatMessage(6, "정리액트", "여기 사람들 다 개발자인가요?", System.currentTimeMillis() - 600000, false),
+                ChatMessage(7, "한고민", "저는 디자이너입니다~ 혹시 협업할 개발자 구하시나요?", System.currentTimeMillis() - 300000, false)
+            )
+        )
+    }
     
-    // 스크롤 상태
-    val listState = rememberLazyListState()
-    val scrollToBottom by remember { derivedStateOf { messages.isNotEmpty() } }
-    
-    // 새 메시지가 추가되면 자동 스크롤
-    LaunchedEffect(scrollToBottom, messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size - 1)
+    fun sendMessage() {
+        if (messageInput.isBlank() || !canSendMessage) return
+        
+        val newMessage = ChatMessage(
+            messages.size + 1,
+            "나", // 사용자 이름
+            messageInput.trim(),
+            System.currentTimeMillis(),
+            true // 내가 보낸 메시지임을 표시
+        )
+        
+        messages = messages + newMessage
+        messageInput = ""
+        
+        // 메시지 전송 후 딜레이 설정 (1.5초)
+        canSendMessage = false
+        coroutineScope.launch {
+            delay(1500) // 1.5초 딜레이
+            canSendMessage = true
         }
     }
     
-    // 스크롤 동작을 위한 설정
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    // 메시지 스크롤 효과
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(0)
+        }
+    }
     
     Surface(
         modifier = Modifier
-            .fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .imePadding() // 키보드가 올라올 때 입력 영역이 키보드 위로 올라오도록 설정
+            .systemBarsPadding() // 시스템 바(상태바, 내비게이션 바)를 고려한 패딩 적용
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(NavyTop, NavyBottom)
-                    )
-                )
+                .background(MaterialTheme.colorScheme.background)
                 .padding(paddingValues)
-                .windowInsetsPadding(WindowInsets.safeDrawing)
-                .imePadding()
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
         ) {
-            // 앱 바
-            TopAppBar(
-                title = { Text("공용 채팅", color = TextWhite) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "뒤로 가기",
-                            tint = TextWhite
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 탑 앱바
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = "모두의 광장",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
                         )
-                    }
-                },
-                actions = {
-                    // 참여자 수 아이콘
-                    IconButton(onClick = { showUsersModal = true }) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
-                                imageVector = Icons.Filled.People,
-                                contentDescription = "참여자 목록",
-                                tint = BleAccent
-                            )
-                            Text(
-                                text = nearbyUsers.size.toString(),
-                                fontSize = 14.sp,
-                                color = TextWhite,
-                                fontWeight = FontWeight.Bold
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "뒤로가기",
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = NavyTop,
-                    titleContentColor = TextWhite
-                ),
-                scrollBehavior = scrollBehavior
-            )
-            
-            // 메시지 목록
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(NavyTop, NavyBottom)
+                    },
+                    actions = {
+                        // 참여자 수 아이콘
+                        IconButton(onClick = { showUsersModal = true }) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.People,
+                                    contentDescription = "참여자 목록",
+                                    tint = MaterialTheme.colorScheme.secondary
+                                )
+                                Text(
+                                    text = nearbyUsers.size.toString(),
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
+                        navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground,
+                        actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                    ),
+                    scrollBehavior = scrollBehavior
+                )
+                
+                // 메시지 목록
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 8.dp),
+                    state = listState,
+                    reverseLayout = true, // DirectChatScreen과 일관되게 설정
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    items(messages.reversed()) { msg -> // 메시지를 역순으로 표시
+                        ChatMessageBubble(
+                            senderName = if (msg.isMe) "나" else msg.sender,
+                            text = msg.text,
+                            time = formatTime(msg.time),
+                            isMe = msg.isMe,
+                            senderProfileId = msg.senderProfileId,
+                            navController = navController,
+                            distance = msg.distance,
+                            chatBubbleColor = if (msg.isMe) ChatBubbleMine else ChatBubbleOthers,
+                            textColor = MaterialTheme.colorScheme.onBackground,
+                            metaTextColor = MaterialTheme.colorScheme.secondary
                         )
-                    )
-                    .padding(horizontal = 8.dp),
-                state = listState,
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                items(messages) { msg ->
-                    ChatMessageBubble(
-                        senderName = msg.sender,
-                        text = msg.text,
-                        time = msg.time,
-                        isMe = msg.isMe,
-                        senderProfileId = msg.senderProfileId,
-                        navController = navController,
-                        distance = msg.distance
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
+                
+                // 메시지 입력창 영역
+                PublicChatInputRow(
+                    message = messageInput,
+                    onMessageChange = { messageInput = it },
+                    onSendClick = { sendMessage() },
+                    isSendEnabled = canSendMessage
+                )
             }
             
-            // 메시지 입력창 영역
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = ChatInputBackground
-                ),
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            // 주변 사용자 목록 모달
+            AnimatedVisibility(
+                visible = showUsersModal,
+                enter = fadeIn(),
+                exit = fadeOut()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // 메시지 입력 필드
-                    TextField(
-                        value = messageInput,
-                        onValueChange = { messageInput = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        placeholder = { 
-                            Text(
-                                text = "메시지를 입력하세요",
-                                color = TextWhite70
-                            ) 
-                        },
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedTextColor = TextWhite,
-                            unfocusedTextColor = TextWhite,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = BleAccent
-                        ),
-                        maxLines = 3,
-                        shape = RoundedCornerShape(24.dp)
-                    )
-                    
-                    // 전송 버튼
+                NearbyUsersModal(
+                    users = nearbyUsers,
+                    onDismiss = { showUsersModal = false },
+                    navController = navController
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun PublicChatInputRow(
+    message: String,
+    onMessageChange: (String) -> Unit,
+    onSendClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isSendEnabled: Boolean = true
+) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                value = message,
+                onValueChange = onMessageChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("메시지 입력...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)) },
+                shape = RoundedCornerShape(24.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    disabledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                    cursorColor = MaterialTheme.colorScheme.primary,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                ),
+                trailingIcon = {
                     IconButton(
-                        onClick = {
-                            if (messageInput.isNotEmpty()) {
-                                val newMessage = Message(
-                                    id = messages.size + 1,
-                                    sender = "도경원",
-                                    text = messageInput,
-                                    time = "지금",
-                                    isMe = true,
-                                    senderProfileId = 1,
-                                    distance = 0f
-                                )
-                                messages.add(newMessage)
-                                messageInput = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(BleBlue1, BleAccent)
-                                )
-                            )
+                        onClick = onSendClick,
+                        enabled = message.isNotBlank() && isSendEnabled
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "전송",
-                            tint = TextWhite
+                            tint = if (message.isNotBlank() && isSendEnabled) 
+                                   MaterialTheme.colorScheme.secondary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
-            }
-        }
-        
-        // 주변 사용자 목록 모달
-        AnimatedVisibility(
-            visible = showUsersModal,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            NearbyUsersModal(
-                users = nearbyUsers,
-                onDismiss = { showUsersModal = false },
-                navController = navController
             )
         }
     }
@@ -319,8 +333,21 @@ fun PublicChatScreen(
 @Preview(showBackground = true)
 @Composable
 fun PublicChatScreenPreview() {
-    LanternTheme {
-        val dummyNavController = NavController(LocalContext.current)
-        PublicChatScreen(navController = dummyNavController)
+    LanternsTheme {
+        PublicChatScreen(navController = NavController(LocalContext.current))
     }
+}
+
+// 타임스탬프를 "오전 10:30" 형식으로 변환하는 함수
+private fun formatTime(timestamp: Long): String {
+    val calendar = java.util.Calendar.getInstance().apply {
+        timeInMillis = timestamp
+    }
+    val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    val minute = calendar.get(java.util.Calendar.MINUTE)
+    
+    val amPm = if (hour < 12) "오전" else "오후"
+    val hour12 = if (hour == 0 || hour == 12) 12 else hour % 12
+    
+    return "$amPm ${hour12}:${minute.toString().padStart(2, '0')}"
 }

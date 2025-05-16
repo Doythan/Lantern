@@ -75,9 +75,10 @@ abstract class DataModule { // object -> abstract class
             chatRoomDao: ChatRoomDao,
             messagesDao: MessagesDao,
             followDao: FollowDao,
-            callListDao: CallListDao
+            callListDao: CallListDao,
+            @ApplicationContext context: Context
         ): UserRepositoryImpl {
-            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao)
+            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao, context)
         }
 
         // AdvertiserManager, GattServerManager, GattClientManager @Provides도 여기로 이동

@@ -60,7 +60,8 @@ data class ChatUser(
 fun NearbyUsersModal(
     users: List<ChatUser>,
     onDismiss: () -> Unit,
-    navController: NavController? = null
+    navController: NavController? = null,
+    onUserClick: (userId: String) -> Unit = {}
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -78,8 +79,7 @@ fun NearbyUsersModal(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(0.5f)
-                    .background(color = androidx.compose.ui.graphics.Color.Black)
+                    .background(MaterialTheme.colorScheme.scrim)
                     .clickable { onDismiss() }
             )
             
@@ -101,7 +101,7 @@ fun NearbyUsersModal(
                         .heightIn(max = 500.dp),
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = NavyTop
+                        containerColor = DarkModalBackground
                     ),
                     elevation = CardDefaults.cardElevation(
                         defaultElevation = 8.dp
@@ -122,21 +122,20 @@ fun NearbyUsersModal(
                         ) {
                             Text(
                                 text = "채팅방 참여자 (${users.size})",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextWhite
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             
                             IconButton(onClick = onDismiss) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "닫기",
-                                    tint = TextWhite70
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                 )
                             }
                         }
                         
-                        HorizontalDivider(color = TextWhite.copy(alpha = 0.1f))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                         
                         // 사용자 목록
                         LazyColumn(
@@ -144,11 +143,13 @@ fun NearbyUsersModal(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(users) { user ->
+                            items(users.sortedBy { it.distance }) { user ->
                                 ChatUserItem(
                                     user = user,
-                                    navController = navController,
-                                    onDismiss = onDismiss
+                                    onUserClick = {
+                                        onUserClick(user.id.toString())
+                                        onDismiss()
+                                    }
                                 )
                             }
                         }
@@ -165,8 +166,7 @@ fun NearbyUsersModal(
 @Composable
 fun ChatUserItem(
     user: ChatUser,
-    navController: NavController? = null,
-    onDismiss: (() -> Unit)? = null
+    onUserClick: () -> Unit
 ) {
     val connectionColor = getConnectionColorByDistance(user.distance)
     
@@ -174,23 +174,13 @@ fun ChatUserItem(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .clickable(enabled = navController != null) {
-                // 프로필 화면으로 이동
-                navController?.let { 
-                    val route = AppDestinations.PROFILE_ROUTE
-                        .replace("{userId}", user.id.toString())
-                        .replace("{name}", user.name)
-                        .replace("{distance}", "${user.distance.toInt()}m")
-                    it.navigate(route)
-                    onDismiss?.invoke() // 모달 닫기
-                }
-            },
+            .clickable { onUserClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = NavyBottom
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = 4.dp
+            defaultElevation = 2.dp
         )
     ) {
         Row(
@@ -198,76 +188,32 @@ fun ChatUserItem(
                 .fillMaxWidth()
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // 사용자 아바타
-            ProfileAvatar(
-                profileId = user.id,
-                borderColor = connectionColor,
-                hasBorder = true,
-                size = 48.dp,
-                onClick = if (navController != null) {
-                    {
-                        // 프로필 화면으로 이동
-                        val route = AppDestinations.PROFILE_ROUTE
-                            .replace("{userId}", user.id.toString())
-                            .replace("{name}", user.name)
-                            .replace("{distance}", "${user.distance.toInt()}m")
-                        navController.navigate(route)
-                        onDismiss?.invoke() // 모달 닫기
-                    }
-                } else null
-            )
-            
-            // 사용자 정보
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.name,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextWhite,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ProfileAvatar(
+                    profileId = user.id,
+                    name = user.name,
+                    size = 40.dp,
+                    borderColor = connectionColor,
+                    hasBorder = true
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
                     Text(
-                        text = "거리:",
-                        fontSize = 12.sp,
-                        color = TextWhite70
+                        text = user.name,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${user.distance.toInt()}m",
-                        fontSize = 12.sp,
-                        color = connectionColor,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    ConnectionStrengthIndicator(
-                        distance = user.distance,
-                        color = connectionColor
+                        text = "${user.distance.toInt()}m | 메시지 ${user.messageCount.toInt()}개",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
-            }
-            
-            // 거리 표시
-            Box(
-                modifier = Modifier
-                    .background(
-                        color = connectionColor.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Text(
-                    text = getConnectionStrengthText(user.distance),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = connectionColor
-                )
             }
         }
     }
@@ -302,27 +248,39 @@ fun ConnectionStrengthIndicator(
                     .weight(1f)
                     .clip(RoundedCornerShape(2.dp))
                     .background(
-                        color = if (index < bars) color else TextWhite.copy(alpha = 0.2f)
+                        color = if (index < bars) color else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
                     )
             )
         }
     }
 }
 
-@Preview
+@Preview(showBackground = true)
 @Composable
 fun NearbyUsersModalPreview() {
-    LanternTheme {
-        val dummyNavController = rememberNavController()
-        val dummyUsers = listOf(
-            ChatUser(1, "도경원", 50f, 5f),
-            ChatUser(2, "유저2", 150f, 3f),
-            ChatUser(3, "유저3", 300f, 1f)
-        )
-        NearbyUsersModal(
-            users = dummyUsers, 
-            onDismiss = {},
-            navController = dummyNavController
-        )
+    val sampleUsers = listOf(
+        ChatUser(1, "김싸피", 50f, 5f),
+        ChatUser(2, "이테마", 250f, 2f),
+        ChatUser(3, "박코딩", 800f, 10f)
+    )
+    LanternsTheme {
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            NearbyUsersModal(
+                users = sampleUsers,
+                onDismiss = {},
+                onUserClick = { userId -> println("User clicked: $userId") }
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ChatUserItemPreview() {
+    val sampleUser = ChatUser(1, "최미리", 120f, 8f)
+    LanternsTheme {
+        Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.padding(8.dp)) {
+            ChatUserItem(user = sampleUser, onUserClick = { println("User item clicked: ${sampleUser.name}") })
+        }
     }
 } 

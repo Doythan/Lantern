@@ -163,6 +163,13 @@ class DirectChatViewModel @Inject constructor(
     }
 
     /**
+     * 오류 메시지를 지웁니다.
+     */
+    fun clearErrorMessage() {
+        _uiState.update { it.copy(errorMessage = null) }
+    }
+
+    /**
      * 초기 데이터 로드
      */
     private fun loadInitialData() {

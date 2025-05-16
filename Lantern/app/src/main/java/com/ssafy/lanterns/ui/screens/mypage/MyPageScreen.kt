@@ -19,20 +19,27 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -48,17 +55,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.ssafy.lanterns.R
 import com.ssafy.lanterns.data.model.User
 import com.ssafy.lanterns.ui.theme.*
-import com.ssafy.lanterns.ui.util.getProfileImageByNumber
+import com.ssafy.lanterns.ui.theme.LanternsTheme
 import com.ssafy.lanterns.ui.util.getAllProfileImageResources
+import com.ssafy.lanterns.ui.util.getProfileImageByNumber
 import kotlinx.coroutines.flow.collectLatest
-import androidx.compose.material.ContentAlpha
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.toArgb
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyPageScreen(
     viewModel: MyPageViewModel = hiltViewModel(),
@@ -68,6 +70,7 @@ fun MyPageScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showImageSelectionDialog by remember { mutableStateOf(false) }
+    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
 
     // 로그아웃 이벤트 감지
     LaunchedEffect(key1 = viewModel.logoutEvent) {
@@ -81,6 +84,7 @@ fun MyPageScreen(
     LaunchedEffect(key1 = uiState.errorMessage) {
         uiState.errorMessage?.let { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            viewModel.clearErrorMessage()
         }
     }
 
@@ -92,26 +96,66 @@ fun MyPageScreen(
             onImageSelected = { selectedNumber ->
                 viewModel.updateSelectedProfileImageNumber(selectedNumber)
                 showImageSelectionDialog = false
-            }
+            },
         )
     }
+
+    // 로그아웃 확인 다이얼로그
+    if (showLogoutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmDialog = false },
+            title = { Text("로그아웃") },
+            text = { Text("정말 로그아웃 하시겠습니까?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutConfirmDialog = false
+                        viewModel.logout()
+                    }
+                ) {
+                    Text("확인", color = LanternYellow)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLogoutConfirmDialog = false }
+                ) {
+                    Text("취소")
+                }
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    val textColor = MaterialTheme.colorScheme.onBackground
+    val textColorSecondary = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(NavyTop, NavyBottom)
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
             .padding(paddingValues) // 하단 네비게이션 바 고려
     ) {
+        // 로딩 중이면 로딩 인디케이터 표시
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = LanternYellow) // LanternYellow로 고정
+            }
+        }
+
         // Content Area
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 32.dp)
-                .padding(top = 24.dp),
+                .padding(top = 24.dp, bottom = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 상단 헤더
@@ -124,30 +168,54 @@ fun MyPageScreen(
             ) {
                 Text(
                     text = "프로필",
-                    color = Color.White,
+                    color = textColor,
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-0.25).sp
                 )
                 
-                Button(
-                    onClick = {
-                        if (uiState.isEditing) viewModel.saveProfileChanges()
-                        else viewModel.toggleEditMode()
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = if (uiState.isEditing) Color(0xFF1DE9B6) else Color(0xFF1DE9B6).copy(alpha = 0.8f),
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.height(40.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = if (uiState.isEditing) "완료" else "수정",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // 로그아웃 아이콘 버튼
+                    IconButton(
+                        onClick = { showLogoutConfirmDialog = true },
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = "로그아웃",
+                            tint = textColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    // 편집 버튼
+                    Button(
+                        onClick = {
+                            if (uiState.isEditing) viewModel.saveProfileChanges()
+                            else viewModel.toggleEditMode()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = LanternYellow, // LanternYellow로 고정
+                            contentColor = Color.Black // 검정색 글자로 고정
+                        ),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = if (uiState.isEditing) "완료" else "수정",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -157,15 +225,17 @@ fun MyPageScreen(
             Box(contentAlignment = Alignment.Center) {
                 val avatarSize = 180.dp
                 val subtleBorderThickness = 1.dp
+                val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                val imageBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
 
                 Box(
                     modifier = Modifier
                         .size(avatarSize)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colors.surface.copy(alpha = 0.1f))
+                        .background(imageBackground)
                         .border(
                             width = subtleBorderThickness,
-                            color = Color.White.copy(alpha = 0.3f),
+                            color = borderColor,
                             shape = CircleShape
                         )
                 ) {
@@ -191,7 +261,7 @@ fun MyPageScreen(
                         modifier = Modifier
                             .size(50.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFF1DE9B6))
+                            .background(LanternYellow) // LanternYellow로 고정
                             .align(Alignment.BottomEnd)
                             .offset(x = 8.dp, y = 8.dp)
                             .clickable { showImageSelectionDialog = true }
@@ -201,7 +271,7 @@ fun MyPageScreen(
                         Icon(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit Profile Image",
-                            tint = Color.White,
+                            tint = Color.Black, // 검정색 글자로 고정
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -211,148 +281,94 @@ fun MyPageScreen(
             Spacer(modifier = Modifier.height(48.dp))
 
             // Nickname Field
-            ProfileEditField(
-                label = "닉네임",
-                value = uiState.nicknameInput,
-                onValueChange = viewModel::updateNickname,
-                isEditing = uiState.isEditing,
-                labelColor = Color(0xB3FFFFFF),
-                valueColor = Color(0xE6FFFFFF),
-                underlineIdleColor = Color(0x26FFFFFF),
-                underlineFocusedColor = Color(0xE6FFFFFF)
-            )
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "닉네임",
+                    color = textColorSecondary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                if (uiState.isEditing) {
+                    OutlinedTextField(
+                        value = uiState.nicknameInput,
+                        onValueChange = viewModel::updateNickname,
+                        textStyle = TextStyle(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = textColor
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                RoundedCornerShape(8.dp)
+                            ),
+                        shape = RoundedCornerShape(8.dp),
+                        placeholder = {
+                            Text(
+                                "닉네임을 입력하세요",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                fontSize = 18.sp
+                            )
+                        },
+                        singleLine = true
+                    )
+                } else {
+                    Text(
+                        text = uiState.nicknameInput.ifEmpty { "-" },
+                        color = textColor,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(vertical = 16.dp, horizontal = 16.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    thickness = 1.dp
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
             // Email Field
-            ProfileDisplayField(
-                label = "이메일",
-                value = uiState.email,
-                labelColor = Color(0xB3FFFFFF),
-                valueColor = Color(0xE6FFFFFF)
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            // Log Out Button
-            val logoutButtonInteractionSource = remember { MutableInteractionSource() }
-            val isLogoutButtonPressed by logoutButtonInteractionSource.collectIsPressedAsState()
-            val logoutButtonColor = Color(0xFF1DE9B6)
-
-            Button(
-                onClick = { viewModel.logout() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = if (isLogoutButtonPressed) logoutButtonColor.copy(alpha = 0.8f) else logoutButtonColor
-                ),
-                interactionSource = logoutButtonInteractionSource
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "로그아웃",
-                    fontSize = 20.sp,
+                    text = "이메일",
+                    color = textColorSecondary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = uiState.email,
+                    color = textColor,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .padding(vertical = 16.dp, horizontal = 16.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                    thickness = 1.dp
                 )
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        // 로딩 인디케이터
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colors.background.copy(alpha = 0.7f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colors.primary)
-            }
-        }
-    }
-}
-
-@Composable
-fun ProfileEditField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    isEditing: Boolean,
-    labelColor: Color = Color.White.copy(alpha = ContentAlpha.medium),
-    valueColor: Color = Color.White,
-    underlineIdleColor: Color = Color.White.copy(alpha = 0.3f),
-    underlineFocusedColor: Color = Color.White
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            color = labelColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = isEditing,
-            textStyle = TextStyle(
-                color = if (isEditing) valueColor else valueColor.copy(alpha = ContentAlpha.disabled),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            ),
-            cursorBrush = SolidColor(valueColor),
-            modifier = Modifier.fillMaxWidth(),
-            interactionSource = interactionSource,
-            decorationBox = { innerTextField ->
-                Box {
-                    innerTextField()
-                    if (value.isEmpty() && isEditing) {
-                        Text(
-                            text = "닉네임을 입력하세요",
-                            color = valueColor.copy(alpha = ContentAlpha.medium),
-                            fontSize = 18.sp
-                        )
-                    }
-                }
-            }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Divider(
-            color = if (isFocused && isEditing) underlineFocusedColor else underlineIdleColor,
-            thickness = if (isFocused && isEditing) 2.dp else 1.dp
-        )
-    }
-}
-
-@Composable
-fun ProfileDisplayField(
-    label: String,
-    value: String,
-    labelColor: Color = Color.White.copy(alpha = ContentAlpha.medium),
-    valueColor: Color = Color.White
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            color = labelColor,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = value,
-            color = valueColor,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Divider(color = Color.White.copy(alpha = 0.2f), thickness = 1.dp)
     }
 }
 
@@ -360,8 +376,11 @@ fun ProfileDisplayField(
 fun ProfileImageSelectionDialog(
     availableImageResources: Map<Int, Int>,
     onDismiss: () -> Unit,
-    onImageSelected: (Int) -> Unit
+    onImageSelected: (Int) -> Unit,
 ) {
+    val backgroundColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+    val dialogTextColor = MaterialTheme.colorScheme.onSurface
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -384,10 +403,10 @@ fun ProfileImageSelectionDialog(
         ) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
-                color = NavyTop.copy(alpha = 0.95f),
+                color = backgroundColor,
                 border = BorderStroke(
                     width = 1.dp,
-                    color = Color(0xFF1DE9B6)
+                    color = LanternYellow // LanternYellow로 고정
                 )
             ) {
                 Column(
@@ -398,7 +417,7 @@ fun ProfileImageSelectionDialog(
                         "프로필 이미지 선택",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = dialogTextColor,
                         modifier = Modifier.padding(bottom = 20.dp)
                     )
                     
@@ -407,7 +426,7 @@ fun ProfileImageSelectionDialog(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier
-                            .heightIn(max = 300.dp)
+                            .heightIn(max = 300.dp) 
                             .padding(8.dp)
                     ) {
                         items(availableImageResources.entries.toList()) { entry ->
@@ -420,7 +439,7 @@ fun ProfileImageSelectionDialog(
                                     .border(
                                         BorderStroke(
                                             2.dp,
-                                            Color(0xFF1DE9B6)
+                                            LanternYellow // LanternYellow로 고정
                                         ),
                                         CircleShape
                                     )
@@ -448,14 +467,14 @@ fun ProfileImageSelectionDialog(
                             .height(50.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            backgroundColor = Color(0xFF1DE9B6)
+                            containerColor = LanternYellow // LanternYellow로 고정
                         )
                     ) {
                         Text(
                             "취소",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = Color.Black // 검정색 글자로 고정
                         )
                     }
                 }
@@ -464,179 +483,152 @@ fun ProfileImageSelectionDialog(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFFFFFF)
+@Composable
+fun getThemeAccentColor(): Color {
+    return LanternYellow
+}
+
+@Composable
+fun getButtonTextColor(): Color {
+    return Color.Black
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(showBackground = true, backgroundColor = 0xFF0A0F2C)
 @Composable
 fun MyPageScreenPreview() {
-    LanternTheme {
-         val previewUser = User(
-             userId = 0L, 
-             nickname = "@previewUser",
-             deviceId = "preview_device_id",
-             selectedProfileImageNumber = 1
-         )
-         val previewUiState = MyPageUiState(
-             user = previewUser,
-             nicknameInput = "@previewUser",
-             selectedProfileImageNumber = 1,
-             availableProfileImageResources = getAllProfileImageResources()
-         )
-         val isEditing = remember { mutableStateOf(false) }
-         var currentImageNumber by remember { mutableStateOf(previewUiState.selectedProfileImageNumber) }
-         var currentNickname by remember { mutableStateOf(previewUiState.nicknameInput)}
-         var showDialog by remember { mutableStateOf(false) }
+    val previewUiState = MyPageUiState(
+        user = User(userId = 1L, email = "user@example.com", nickname = "랜턴이", selectedProfileImageNumber = 1, deviceId = "preview-device-id"),
+        nicknameInput = "랜턴이",
+        email = "user@example.com"
+    )
 
-        if(showDialog) {
-             ProfileImageSelectionDialog(
-                 availableImageResources = previewUiState.availableProfileImageResources,
-                 onDismiss = { showDialog = false },
-                 onImageSelected = { selectedNumber -> 
-                     currentImageNumber = selectedNumber
-                     showDialog = false
-                 }
-             )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(NavyTop, NavyBottom)
-                    )
-                )
+    LanternsTheme(darkTheme = true) { 
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
         ) {
-             Column(
-                 modifier = Modifier
-                     .fillMaxSize()
-                     .padding(horizontal = 32.dp, vertical = 24.dp),
-                 horizontalAlignment = Alignment.CenterHorizontally
-             ) {
-                 // 상단 헤더
-                 Row(
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .padding(bottom = 24.dp),
-                     horizontalArrangement = Arrangement.SpaceBetween,
-                     verticalAlignment = Alignment.CenterVertically
-                 ) {
-                     Text(
-                         text = "프로필",
-                         color = Color.White,
-                         fontSize = 25.sp,
-                         fontWeight = FontWeight.Bold,
-                         letterSpacing = (-0.25).sp
-                     )
-                     
-                     Button(
-                         onClick = { isEditing.value = !isEditing.value },
-                         colors = ButtonDefaults.buttonColors(
-                             backgroundColor = if (isEditing.value) MaterialTheme.colors.primary 
-                                 else MaterialTheme.colors.primaryVariant.copy(alpha = 0.7f),
-                             contentColor = Color.White
-                         ),
-                         shape = RoundedCornerShape(20.dp),
-                         modifier = Modifier.height(40.dp)
-                     ) {
-                         Text(
-                             text = if (isEditing.value) "완료" else "수정",
-                             fontSize = 16.sp,
-                             fontWeight = FontWeight.Bold
-                         )
-                     }
-                 }
-                 
-                 Spacer(modifier = Modifier.height(32.dp))
-                 
-                 // 프로필 이미지
-                 Box(contentAlignment = Alignment.Center) {
-                     Box(
-                         modifier = Modifier
-                             .size(160.dp)
-                             .clip(CircleShape)
-                             .background(MaterialTheme.colors.surface.copy(alpha = 0.2f))
-                             .border(
-                                 width = 2.dp,
-                                 brush = Brush.linearGradient(
-                                     colors = listOf(MaterialTheme.colors.primary, MaterialTheme.colors.primaryVariant)
-                                 ),
-                                 shape = CircleShape
-                             )
-                     ) {
-                         val actualImageResId = getProfileImageByNumber(currentImageNumber)
-                         Image(
-                             painter = painterResource(id = actualImageResId),
-                             contentDescription = "Profile Image",
-                             modifier = Modifier
-                                 .fillMaxSize()
-                                 .clip(CircleShape)
-                                 .clickable(enabled = isEditing.value) { 
-                                     if(isEditing.value) showDialog = true 
-                                 },
-                             contentScale = ContentScale.Crop
-                         )
-                     }
-                     
-                     if (isEditing.value) {
-                         Box(
-                             modifier = Modifier
-                                 .size(50.dp)
-                                 .clip(CircleShape)
-                                 .background(Color(0xFF1DE9B6))
-                                 .align(Alignment.BottomEnd)
-                                 .offset(x = 8.dp, y = 8.dp)
-                                 .clickable { showDialog = true }
-                                 .zIndex(1f),
-                             contentAlignment = Alignment.Center
-                         ) {
-                             Icon(
-                                 imageVector = Icons.Default.Edit,
-                                 contentDescription = "Edit Profile Image",
-                                 tint = Color.White,
-                                 modifier = Modifier.size(24.dp)
-                             )
-                         }
-                     }
-                 }
-                 
-                 Spacer(modifier = Modifier.height(48.dp))
-                 
-                 // 닉네임 필드
-                 ProfileEditField(
-                     label = "닉네임",
-                     value = currentNickname,
-                     onValueChange = { currentNickname = it },
-                     isEditing = isEditing.value
-                 )
-                 
-                 Spacer(modifier = Modifier.height(24.dp))
-                 
-                 // 이메일 필드
-                 ProfileDisplayField(
-                     label = "이메일",
-                     value = "이메일 정보 없음 (임시)"
-                 )
-                 
-                 Spacer(modifier = Modifier.weight(1f))
-                 
-                 // 로그아웃 버튼
-                 Button(
-                     onClick = { },
-                     modifier = Modifier
-                         .fillMaxWidth()
-                         .height(60.dp),
-                     shape = RoundedCornerShape(20.dp),
-                     colors = ButtonDefaults.buttonColors(
-                         backgroundColor = MaterialTheme.colors.primary
-                     )
-                 ) {
-                     Text(
-                         text = "로그아웃",
-                         fontSize = 20.sp,
-                         fontWeight = FontWeight.SemiBold,
-                         color = Color.White
-                     )
-                 }
-             }
+            val textColor = MaterialTheme.colorScheme.onBackground
+            val textColorSecondary = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(PaddingValues(0.dp))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 32.dp)
+                        .padding(top = 24.dp, bottom = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // 상단 헤더
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "프로필",
+                            color = textColor,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.25).sp
+                        )
+                        
+                        // 상단 버튼 그룹
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // 로그아웃 아이콘 버튼
+                            IconButton(
+                                onClick = { },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        shape = CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                                    contentDescription = "로그아웃",
+                                    tint = textColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            
+                            // 편집 버튼
+                            Button(
+                                onClick = { },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = LanternYellow,
+                                    contentColor = Color.Black
+                                ),
+                                shape = RoundedCornerShape(24.dp),
+                                modifier = Modifier.height(40.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                Text("수정", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    Box(contentAlignment = Alignment.Center) {
+                        val avatarSize = 180.dp
+                        val subtleBorderThickness = 1.dp
+                        val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        val imageBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+
+                        Box(
+                            modifier = Modifier
+                                .size(avatarSize)
+                                .clip(CircleShape)
+                                .background(imageBackground)
+                                .border(width = subtleBorderThickness, color = borderColor, shape = CircleShape)
+                        ) {
+                            Image(
+                                painter = painterResource(id = getProfileImageByNumber(previewUiState.selectedProfileImageNumber)),
+                                contentDescription = "Profile Image",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape).padding(subtleBorderThickness),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(48.dp))
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text("닉네임", color = textColorSecondary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            previewUiState.nicknameInput.ifEmpty { "-" },
+                            color = textColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(vertical = 16.dp, horizontal = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), thickness = 1.dp)
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text("이메일", color = textColorSecondary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            previewUiState.email,
+                            color = textColor, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(vertical = 16.dp, horizontal = 16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), thickness = 1.dp)
+                    }
+                }
+            }
         }
     }
 }

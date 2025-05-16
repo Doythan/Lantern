@@ -61,11 +61,7 @@ fun OngoingCallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(NavyTop, NavyBottom)
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -85,7 +81,7 @@ fun OngoingCallScreen(
             ) {
                 Text(
                     text = callerName,
-                    color = TextWhite,
+                    color = MaterialTheme.colorScheme.onBackground,
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -94,7 +90,7 @@ fun OngoingCallScreen(
                 
                 Text(
                     text = formattedDuration,
-                    color = TextWhite70,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     fontSize = 18.sp
                 )
             }
@@ -128,10 +124,10 @@ fun OngoingCallScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val inactiveButtonColor = DarkCardBackground
-                    val activeButtonColor = Primary
-                    val inactiveIconColor = TextWhite70
-                    val activeIconColor = TextWhite
+                    val inactiveButtonColor = MaterialTheme.colorScheme.surfaceVariant
+                    val activeButtonColor = MaterialTheme.colorScheme.primary
+                    val inactiveIconColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    val activeIconColor = MaterialTheme.colorScheme.onBackground
 
                     // 스피커 버튼
                     Column(
@@ -164,7 +160,7 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "스피커",
-                            color = TextWhite,
+                            color = MaterialTheme.colorScheme.onBackground,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -200,7 +196,7 @@ fun OngoingCallScreen(
                         
                         Text(
                             text = "음소거",
-                            color = TextWhite,
+                            color = MaterialTheme.colorScheme.onBackground,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -221,7 +217,7 @@ fun OngoingCallScreen(
                     Icon(
                         imageVector = Icons.Filled.CallEnd,
                         contentDescription = "End Call",
-                        tint = TextWhite,
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -233,16 +229,11 @@ fun OngoingCallScreen(
 @Preview(showBackground = true)
 @Composable
 fun OngoingCallScreenPreview() {
-    LanternTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = DarkBackground
-        ) {
-            OngoingCallScreen(
-                callerName = "김민수",
-                callerId = 2,
-                onEndCallClick = {}
-            )
-        }
+    LanternsTheme {
+        OngoingCallScreen(
+            callerName = "김민수",
+            callerId = 2,
+            onEndCallClick = {}
+        )
     }
 }

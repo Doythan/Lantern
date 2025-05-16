@@ -60,33 +60,29 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("프로필", color = TextWhite) },
+                title = { Text("프로필", color = MaterialTheme.colorScheme.onBackground) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "뒤로가기",
-                            tint = TextWhite
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = DarkBackground,
-                    titleContentColor = TextWhite
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
             )
         },
-        containerColor = NavyTop
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(NavyTop, NavyBottom)
-                    )
-                )
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // 프로필 내용
             Column(
@@ -119,7 +115,7 @@ fun ProfileScreen(
                     text = userData.name,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = TextWhite
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -155,13 +151,14 @@ fun ProfileScreen(
                         .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = BleAccent
+                        containerColor = LanternYellow
                     )
                 ) {
                     Text(
                         text = "채팅하기",
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        color = Color.Black
                     )
                 }
                 
@@ -175,19 +172,14 @@ fun ProfileScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreenPreview() {
-    LanternTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = NavyTop
-        ) {
-            ProfileScreen(
-                navController = androidx.navigation.compose.rememberNavController(),
-                userData = UserProfileData(
-                    userId = "1",
-                    name = "도경원",
-                    distance = "35m"
-                )
+    LanternsTheme {
+        ProfileScreen(
+            navController = androidx.navigation.compose.rememberNavController(),
+            userData = UserProfileData(
+                userId = "1",
+                name = "도경원",
+                distance = "35m"
             )
-        }
+        )
     }
 } 

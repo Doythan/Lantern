@@ -1,7 +1,7 @@
 package com.ssafy.lanterns.ui.navigation
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.Text
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -9,7 +9,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ssafy.lanterns.ui.common.MainScaffold
-import com.ssafy.lanterns.ui.screens.call.FriendListScreen
 import com.ssafy.lanterns.ui.screens.call.IncomingCallScreen
 import com.ssafy.lanterns.ui.screens.call.OngoingCallScreen
 import com.ssafy.lanterns.ui.screens.call.OutgoingCallScreen
@@ -24,13 +23,12 @@ import com.ssafy.lanterns.ui.screens.mypage.MyPageScreen
 import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIScreen
 import com.ssafy.lanterns.ui.screens.splash.SplashScreen
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.ssafy.lanterns.ui.screens.call.CallHistoryScreen
 
 // 네비게이션 라우트 정의
 object AppDestinations {
     const val SPLASH_ROUTE = "splash"
     const val LOGIN_ROUTE = "login"
-    const val SIGNUP_ROUTE = "signup"
     const val MYPAGE_ROUTE = "mypage"
     const val FRIENDLIST_ROUTE = "friendlist"
     const val INCOMING_CALL_ROUTE = "incomingcall"
@@ -49,6 +47,8 @@ object AppDestinations {
     const val PROFILE_ARG_USER_ID = "userId"
     const val PROFILE_ARG_NAME = "name"
     const val PROFILE_ARG_DISTANCE = "distance"
+
+    const val CALL_HISTORY_ROUTE = "call_history"   
 }
 
 /**
@@ -99,27 +99,19 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             }
         }
 
-        // 홈 화면
-        composable(AppDestinations.HOME_ROUTE) {
+        // 통화 기록 화면
+        composable(AppDestinations.CALL_HISTORY_ROUTE) {
             MainScaffold(navController = navController) { paddingValues ->
-                ChatListScreen(
+                CallHistoryScreen(
+                    navController = navController,
                     paddingValues = paddingValues,
-                    navController = navController
+                    onCallItemClick = { callerId ->
+                        navController.navigate(AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", callerId.toString()))
+                    }
                 )
             }
         }
 
-        // 통화 목록 화면
-        composable(AppDestinations.FRIENDLIST_ROUTE) {
-            MainScaffold(navController = navController) { paddingValues ->
-                FriendListScreen(
-                    onBackClick = { navController.popBackStack() },
-                    onCallItemClick = { navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) },
-                    onProfileClick = { navController.navigate(AppDestinations.MYPAGE_ROUTE) },
-                    paddingValues = paddingValues
-                )
-            }
-        }
 
         // 마이페이지 화면
         composable(AppDestinations.MYPAGE_ROUTE) {
@@ -180,6 +172,16 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                      }
                  }
              )
+        }
+
+        // 채팅 화면
+        composable(AppDestinations.HOME_ROUTE) {
+            MainScaffold(navController = navController) { paddingValues ->
+                ChatListScreen(
+                    paddingValues = paddingValues,
+                    navController = navController
+                )
+            }
         }
 
         // 공용 채팅 화면

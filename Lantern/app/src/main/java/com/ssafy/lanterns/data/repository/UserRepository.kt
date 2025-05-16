@@ -13,4 +13,6 @@ interface UserRepository {
     suspend fun getUserById(userId: Long): User?
     suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int)
     suspend fun clearAllLocalData()
+    suspend fun saveDisplayMode(isDarkMode: Boolean)
+    suspend fun getDisplayMode(): Boolean
 } 
