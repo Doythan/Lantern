@@ -48,6 +48,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lanterns.ui.theme.BleAccent
@@ -124,7 +126,7 @@ fun MainContent(
                 color = BleBlue1.copy(alpha = 0.3f)  // 두 번째 파동은 깊은 파란색
             )
         }
-        
+
         // 세 번째 리플
         if (ripple3.visible) {
             RippleCircle(

@@ -134,4 +134,4 @@ abstract class DataModule { // object -> abstract class
 
     // PermissionHelper는 Activity가 필요하므로 ViewModel 주입 부적합.
     // Composable에서 직접 처리 (Accompanist 사용)
-} 
+}
