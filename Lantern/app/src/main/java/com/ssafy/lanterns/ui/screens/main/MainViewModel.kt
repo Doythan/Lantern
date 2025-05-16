@@ -1,5 +1,6 @@
 package com.ssafy.lanterns.ui.screens.main
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
@@ -42,7 +43,13 @@ class MainViewModel @Inject constructor(
     // TODO: BLE 관련 의존성 주입
     // private val bleServiceManager: BleServiceManager
 ) : ViewModel() {
-    
+
+    companion object {
+        private const val TAG = "MainViewModel" // 로깅을 위한 TAG 상수
+        private const val AI_ACTIVATION_DEBOUNCE_MS = 2000L // 2초 (Debounce 시간)
+    }
+
+
     // UI 상태 관리
     private val _uiState = MutableStateFlow(MainScreenState())
     val uiState: StateFlow<MainScreenState> = _uiState.asStateFlow()
@@ -57,15 +64,30 @@ class MainViewModel @Inject constructor(
     /**
      * AI 화면을 활성화합니다.
      */
+
+    private var lastAiActivationTime = 0L
+
     fun activateAI() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastAiActivationTime < AI_ACTIVATION_DEBOUNCE_MS) {
+            Log.d(TAG, "activateAI() 호출 무시됨 (Debounce). 마지막 활성화 후 ${currentTime - lastAiActivationTime}ms 지남.")
+            return
+        }
+        lastAiActivationTime = currentTime
+
+        val oldValue = _aiActive.value
         _aiActive.value = true
+        Log.d(TAG, "activateAI() 호출됨. _aiActive 변경: $oldValue -> ${_aiActive.value}")
     }
 
     /**
      * AI 화면을 비활성화합니다.
      */
     fun deactivateAI() {
+        val oldValue = _aiActive.value
         _aiActive.value = false
+        Log.d("MainViewModel", "deactivateAI() 호출됨. _aiActive 변경: $oldValue -> ${_aiActive.value}")
+
     }
     
     /**
