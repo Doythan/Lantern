@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -59,11 +58,7 @@ fun OutgoingCallScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(NavyTop, NavyBottom)
-                )
-            )
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -103,7 +98,7 @@ fun OutgoingCallScreen(
                 // 수신자 이름
                 Text(
                     text = receiverName,
-                    color = TextWhite,
+                    color = MaterialTheme.colorScheme.onBackground,
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -113,7 +108,7 @@ fun OutgoingCallScreen(
                 // "통화 거는 중..." 텍스트 (깜빡이는 효과)
                 Text(
                     text = "통화 거는 중...",
-                    color = TextWhite70,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
                     fontSize = 18.sp,
                     modifier = Modifier.alpha(alpha)
                 )
@@ -137,7 +132,7 @@ fun OutgoingCallScreen(
                     Icon(
                         imageVector = Icons.Filled.CallEnd,
                         contentDescription = "Cancel Call",
-                        tint = TextWhite,
+                        tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -149,16 +144,11 @@ fun OutgoingCallScreen(
 @Preview(showBackground = true)
 @Composable
 fun OutgoingCallScreenPreview() {
-    LanternTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = DarkBackground
-        ) {
-            OutgoingCallScreen(
-                receiverName = "김민수",
-                receiverId = 2,
-                onCancelClick = {}
-            )
-        }
+    LanternsTheme {
+        OutgoingCallScreen(
+            receiverName = "김민수",
+            receiverId = 2,
+            onCancelClick = {}
+        )
     }
 } 

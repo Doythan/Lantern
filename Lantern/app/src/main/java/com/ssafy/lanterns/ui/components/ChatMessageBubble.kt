@@ -7,12 +7,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -37,6 +39,10 @@ import com.ssafy.lanterns.ui.util.getProfileImageResId
  * @param senderProfileId 발신자 프로필 ID (색상 지정용)
  * @param navController 선택사항: 프로필 클릭 시 프로필 화면으로 이동하기 위한 네비게이션 컨트롤러
  * @param distance 선택사항: 거리 정보 (미터 단위)
+ * @param chatBubbleColor 채팅 버블의 배경색
+ * @param textColor 메시지 텍스트의 색상
+ * @param metaTextColor 메타 텍스트(발신자 이름, 전송 시간)의 색상
+ * @param avatarBorderColor 프로필 아바타의 테두리 색상
  */
 @Composable
 fun ChatMessageBubble(
@@ -46,7 +52,25 @@ fun ChatMessageBubble(
     isMe: Boolean = false,
     senderProfileId: Int? = null,
     navController: NavController? = null,
-    distance: Float = 50f
+    distance: Float = 50f,
+    chatBubbleColor: Color = if (isMe) 
+                               MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
+                               .compositeOver(MaterialTheme.colorScheme.primaryContainer)
+                            else 
+                               MaterialTheme.colorScheme.surface
+                               .copy(alpha = 0.9f),
+    textColor: Color = if (isMe) 
+                         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.9f)
+                      else 
+                         MaterialTheme.colorScheme.onSurface,
+    metaTextColor: Color = if (isMe)
+                             MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                           else
+                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+    avatarBorderColor: Color = if (isMe)
+                                 MaterialTheme.colorScheme.secondary
+                               else
+                                 MaterialTheme.colorScheme.primary
 ) {
     val bubbleShape = RoundedCornerShape(
         topStart = 16.dp,
@@ -55,9 +79,6 @@ fun ChatMessageBubble(
         bottomEnd = if (isMe) 4.dp else 16.dp
     )
 
-    // 기본 연결 색상 사용
-    val connectionColor = BleBlue1
-    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -66,18 +87,15 @@ fun ChatMessageBubble(
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMe) {
-            // 프로필 아바타 (다른 사람의 메시지일 때만 표시)
-            Box(
-                modifier = Modifier.clip(CircleShape)
-            ) {
+            Box(modifier = Modifier.clip(CircleShape)) {
                 ProfileAvatar(
-                    profileId = senderProfileId ?: 1,
+                    profileId = senderProfileId ?: 1, 
+                    name = senderName, 
                     size = 36.dp,
-                    borderColor = connectionColor,
+                    borderColor = avatarBorderColor, 
                     hasBorder = true,
                     onClick = if (navController != null && senderProfileId != null) {
                         {
-                            // 프로필 화면으로 이동
                             val route = AppDestinations.PROFILE_ROUTE
                                 .replace("{userId}", senderProfileId.toString())
                                 .replace("{name}", senderName)
@@ -96,54 +114,58 @@ fun ChatMessageBubble(
             if (!isMe) {
                 Text(
                     text = senderName,
-                    fontSize = 12.sp,
-                    color = TextWhite70,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold), 
+                    color = metaTextColor, 
                     modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                 )
             }
             
-            Column(
+            androidx.compose.material3.Surface(
+                shape = bubbleShape,
+                color = chatBubbleColor,
+                shadowElevation = 4.dp,
+                tonalElevation = 2.dp,
+                border = if (!isMe) androidx.compose.foundation.BorderStroke(
+                    width = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                ) else null,
                 modifier = Modifier
-                    .clip(bubbleShape)
-                    .background(if (isMe) ChatBubbleMine else ChatBubbleOthers)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
-                Text(
-                    text = text,
-                    color = TextWhite,
-                    fontSize = 16.sp
-                )
-                
-                Spacer(modifier = Modifier.height(2.dp))
-                
-                Text(
-                    text = time,
-                    fontSize = 10.sp,
-                    color = TextWhite70,
-                    modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
-                )
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = text,
+                        color = textColor,
+                        style = MaterialTheme.typography.bodyLarge 
+                    )
+                    
+                    Spacer(modifier = Modifier.height(2.dp))
+                    
+                    Text(
+                        text = time,
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = metaTextColor,
+                        modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
+                    )
+                }
             }
         }
         
         if (isMe) {
             Spacer(modifier = Modifier.width(8.dp))
-            // 프로필 아바타 (내 메시지일 때는 더 작게 표시)
-            Box(
-                modifier = Modifier.clip(CircleShape)
-            ) {
+            Box(modifier = Modifier.clip(CircleShape)) {
                 ProfileAvatar(
-                    profileId = senderProfileId ?: 1,
-                    size = 24.dp,
-                    borderColor = connectionColor,
+                    profileId = senderProfileId ?: 0, 
+                    name = "나", 
+                    size = 28.dp,
+                    borderColor = avatarBorderColor,
                     hasBorder = true,
-                    onClick = if (navController != null && senderProfileId != null) {
+                    onClick = if (navController != null && senderProfileId != null) { 
                         {
-                            // 프로필 화면으로 이동
-                            val route = AppDestinations.PROFILE_ROUTE
-                                .replace("{userId}", senderProfileId.toString())
-                                .replace("{name}", senderName)
-                                .replace("{distance}", "${distance.toInt()}m")
-                            navController.navigate(route)
+                            // val route = ... 내 프로필 화면으로
+                            // navController.navigate(route)
                         }
                     } else null
                 )
@@ -167,6 +189,7 @@ fun ChatProfileAvatar(
 ) {
     ProfileAvatar(
         profileId = profileId,
+        name = "User $profileId", // ProfileAvatar에 name이 필요하므로 임시 이름 추가
         size = size,
         borderColor = connectionColor,
         hasBorder = true,
@@ -174,37 +197,45 @@ fun ChatProfileAvatar(
     )
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF051225)
+@Preview(showBackground = true)
 @Composable
 fun ChatMessageBubblePreview() {
-    Column {
-        val dummyNavController = rememberNavController()
-        
-        ChatMessageBubble(
-            senderName = "도경원",
-            text = "안녕하세요. 채팅 테스트입니다.",
-            time = "10:21 PM",
-            isMe = true,
-            senderProfileId = 1,
-            navController = dummyNavController
-        )
-        
-        ChatMessageBubble(
-            senderName = "유저1",
-            text = "반갑습니다! 이것은 다른 사람이 보낸 메시지입니다.",
-            time = "10:22 PM",
-            isMe = false,
-            senderProfileId = 2,
-            navController = dummyNavController
-        )
-        
-        ChatMessageBubble(
-            senderName = "유저2",
-            text = "다른 사용자의 메시지입니다.",
-            time = "10:23 PM",
-            isMe = false,
-            senderProfileId = 3,
-            navController = dummyNavController
-        )
+    LanternsTheme { 
+        Column(Modifier.background(MaterialTheme.colorScheme.background).padding(8.dp)) {
+            val dummyNavController = rememberNavController()
+
+            ChatMessageBubble(
+                senderName = "나",
+                text = "안녕하세요. 이것은 내가 보낸 메시지입니다. 테마 기본 색상이 적용됩니다.",
+                time = "10:21 PM",
+                isMe = true,
+                senderProfileId = 0,
+                navController = dummyNavController
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            ChatMessageBubble(
+                senderName = "상대방",
+                text = "반갑습니다! 이것은 다른 사람이 보낸 메시지입니다. 테마 기본 색상이 적용됩니다.",
+                time = "10:22 PM",
+                isMe = false,
+                senderProfileId = 2,
+                navController = dummyNavController
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            ChatMessageBubble(
+                senderName = "나 (커스텀 색상)",
+                text = "이 메시지는 외부에서 지정된 색상(ChatBubbleMine, TextPrimary)을 사용합니다.",
+                time = "10:23 PM",
+                isMe = true,
+                senderProfileId = 0,
+                navController = dummyNavController,
+                chatBubbleColor = ChatBubbleMine, 
+                textColor = TextPrimary,
+                metaTextColor = TextPrimary.copy(alpha = 0.7f)
+            )
+        }
     }
 } 

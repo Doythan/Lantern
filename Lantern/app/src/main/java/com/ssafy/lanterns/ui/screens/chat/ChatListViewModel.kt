@@ -26,6 +26,7 @@ import kotlin.random.Random
 data class ChatListUiState(
     val isLoading: Boolean = false,
     val chatList: List<ChatItem> = emptyList(),
+    // 주변 사용자 목록 필드 주석 처리
     val nearbyUsers: List<NearbyUser> = emptyList(),
     val errorMessage: String? = null
 )
@@ -72,6 +73,7 @@ class ChatListViewModel @Inject constructor(
                 
                 // 채팅방 및 주변 사용자 로드
                 loadChatRooms()
+                // 주변 사용자 생성 함수 호출 주석 처리
                 generateNearbyUsers() // 주변 사용자 데이터 생성 (실제로는 BLE 스캐닝으로 대체)
             } catch (e: Exception) {
                 _uiState.update {

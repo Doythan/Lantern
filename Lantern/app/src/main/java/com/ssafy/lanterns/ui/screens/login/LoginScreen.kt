@@ -33,7 +33,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.ssafy.lanterns.R
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.LanternsTheme
 import kotlinx.coroutines.launch
 
 private const val TAG = "LoginScreenImpl"
@@ -234,7 +234,7 @@ fun LoginScreen(
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun LoginScreenPreview() {
-    LanternTheme {
+    LanternsTheme {
         // Preview에서는 Hilt ViewModel을 직접 주입하기 어려우므로,
         // 실제 ViewModel의 기능을 모방하거나, 필요한 최소한의 데이터를 가진
         // 가짜 ViewModel을 만들어 사용하는 것이 일반적입니다.

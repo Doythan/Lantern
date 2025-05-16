@@ -37,7 +37,8 @@ class AuthRepositoryGoogleImpl @Inject constructor(
                 val user = User(
                     userId = authResponse.userId,
                     nickname = authResponse.nickname,
-                    deviceId = "" // 구글 로그인에서는 deviceId가 필요 없음, 빈 문자열로 설정
+                    deviceId = "", // 구글 로그인에서는 deviceId가 필요 없음, 빈 문자열로 설정
+                    email = authResponse.email // 이메일 정보 추가
                 )
                 
                 AuthResult.Success(user)

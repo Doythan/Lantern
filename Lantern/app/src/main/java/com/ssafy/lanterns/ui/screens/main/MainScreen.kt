@@ -46,7 +46,7 @@ import com.ssafy.lanterns.ui.screens.main.components.MainContent
 import com.ssafy.lanterns.ui.screens.main.components.RippleState
 import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIDialog
 import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIViewModel
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.LanternsTheme
 import com.ssafy.lanterns.ui.theme.NavyBottom
 import com.ssafy.lanterns.ui.theme.NavyTop
 import kotlinx.coroutines.coroutineScope
@@ -75,7 +75,6 @@ fun MainScreen(
 ) {
     // ViewModel로부터 UI 상태 수집
     val uiState by viewModel.uiState.collectAsState()
-    val aiActive by viewModel.aiActive.collectAsState()
     
     // 코루틴 스코프
     val coroutineScope = rememberCoroutineScope()
@@ -105,20 +104,6 @@ fun MainScreen(
         }
     }
     
-    // =====================================================
-    // TODO: [BLE] BLE 권한 및 블루투스 상태 확인 로직 구현 필요
-    // 앱 시작 또는 화면 활성화 시 권한 확인 및 ViewModel에 상태 업데이트 (viewModel.updateBlePermissionStatus, viewModel.updateBluetoothState 호출)
-    // LaunchedEffect(Unit) {
-    //     // 블루투스 권한 확인
-    //     val hasBluetoothPermissions = checkBluetoothPermissions(context)
-    //     viewModel.updateBlePermissionStatus(hasBluetoothPermissions)
-    //     
-    //     // 블루투스 활성화 상태 확인
-    //     val isBluetoothEnabled = isBluetoothEnabled(context)
-    //     viewModel.updateBluetoothState(isBluetoothEnabled)
-    // }
-    // =====================================================
-    
     // 생명주기에 따른 스캔 상태 관리
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -133,19 +118,6 @@ fun MainScreen(
                         coroutineScope.launch {
                             runRippleAnimation(rippleAnimatable1, rippleAnimatable2, rippleAnimatable3)
                         }
-                        
-                        // =====================================================
-                        // TODO: BLE 서비스 상태 확인 및 복원
-                        // 앱이 다시 포그라운드로 돌아올 때 BLE 서비스 상태를 확인하고 복원합니다.
-                        // 
-                        // val isBluetoothEnabled = isBluetoothEnabled(context)
-                        // viewModel.updateBluetoothState(isBluetoothEnabled)
-                        // 
-                        // if (uiState.isBleServiceActive) {
-                        //     // BLE 서비스가 활성화 상태라면 상태를 확인하고 필요시 다시 시작
-                        //     checkAndRestartBleServiceIfNeeded(context, viewModel)
-                        // }
-                        // =====================================================
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -229,7 +201,7 @@ fun MainScreen(
                 runRippleAnimation(rippleAnimatable1, rippleAnimatable2, rippleAnimatable3)
                 
                 // 중요: 애니메이션 재시작을 위한 대기 시간
-                delay(800) // 800ms 대기 - 이 값을 더 크게 하면 파동이 느려짐
+                delay(1000) // 1000ms 대기로 변경 - 파동 간격 늘림
             }
         } else {
             // 스캔 종료 시 애니메이션 상태 초기화
@@ -246,65 +218,33 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(NavyTop, NavyBottom)
-                    )
+                    color = MaterialTheme.colorScheme.background
                 )
                 .windowInsetsPadding(WindowInsets.safeDrawing) // 시스템 바 영역 패딩 적용
                 .padding(paddingValues) // 네비게이션 바 영역 패딩 적용
                 .then(modifier),
             contentAlignment = Alignment.Center
         ) {
-            // AI 호출 버튼
-            FloatingActionButton(
-                onClick = { 
-                    // 라우트 이동 대신 AI 활성화 함수 호출
-                    viewModel.activateAI()
-                },
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp),
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Mic,
-                    contentDescription = "Voice AI"
-                )
-            }
-            
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
                 isScanning = uiState.isScanning,
                 onScanToggle = { 
-                    // =====================================================
-                    // TODO: 시작/중지 버튼 클릭 시 BLE 권한 확인 로직
-                    // 버튼을 클릭할 때 BLE 권한을 확인하고 필요하다면 권한 요청을 수행합니다.
-                    // 권한이 있으면 스캔 토글 함수를 호출합니다.
-                    // 
-                    // if (!uiState.isScanning) {
-                    //     // 시작하기 버튼을 누를 때, BLE 권한 확인
-                    //     if (!hasRequiredBlePermissions(context)) {
-                    //         // 권한이 없으면 권한 요청 다이얼로그 표시
-                    //         requestBlePermissions(context)
-                    //         return@MainContent
-                    //     }
-                    //     
-                    //     // 블루투스가 활성화되었는지 확인
-                    //     if (!isBluetoothEnabled(context)) {
-                    //         // 블루투스가 비활성화되어 있으면 활성화 요청 다이얼로그 표시
-                    //         requestEnableBluetooth(context)
-                    //         return@MainContent
-                    //     }
-                    // }
-                    // =====================================================
-                    
                     // 권한과 블루투스 상태가 확인되면 스캔 토글
                     viewModel.toggleScan()
                 },
                 nearbyPeople = uiState.nearbyPeople,
                 showPersonListModal = uiState.showPersonListModal,
                 onShowListToggle = { viewModel.togglePersonListModal() },
-                onPersonClick = viewModel::onPersonClick,
+                onPersonClick = { userId ->
+                    // 채팅 화면으로 이동
+                    navController.navigate("${AppDestinations.DIRECT_CHAT_ROUTE.replace("{userId}", userId)}")
+                    viewModel.togglePersonListModal() // 모달 닫기
+                },
+                onCallClick = { userId ->
+                    // 통화 화면으로 이동
+                    navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", userId)}")
+                    viewModel.togglePersonListModal() // 모달 닫기
+                },
                 rippleStates = Triple(
                     RippleState(rippleVisible.value, rippleAnimatable1.value),
                     RippleState(rippleVisible.value, rippleAnimatable2.value),
@@ -318,145 +258,20 @@ fun MainScreen(
                     dotGlowAlpha = dotGlowAlpha
                 ),
                 buttonText = uiState.buttonText,
-                statusText = uiState.statusText,
                 subTextVisible = uiState.subTextVisible,
                 showListButton = uiState.showListButton
             )
-            
-            // AI 대화상자 표시 - OnDeviceAIScreen 대신 OnDeviceAIDialog 사용
-            if (aiActive) {
-                OnDeviceAIDialog(
-                    onDismiss = { viewModel.deactivateAI() }
-                )
-            }
         }
     }
 }
 
-/**
- * BLE 권한 확인 함수
- * BLE 기능을 사용하기 위해 필요한 권한이 있는지 확인합니다.
- */
-// =====================================================
-// TODO: BLE 권한 확인 함수 구현
-// 
-// private fun hasRequiredBlePermissions(context: Context): Boolean {
-//     // Android 12 이상에서는 BLUETOOTH_SCAN, BLUETOOTH_CONNECT 권한 확인
-//     // Android 11 이하에서는 ACCESS_FINE_LOCATION 권한 확인
-//     
-//     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//         return ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_SCAN) == 
-//                 PackageManager.PERMISSION_GRANTED &&
-//                ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == 
-//                 PackageManager.PERMISSION_GRANTED
-//     } else {
-//         return ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == 
-//                 PackageManager.PERMISSION_GRANTED
-//     }
-// }
-// =====================================================
-
-/**
- * BLE 권한 요청 함수
- * BLE 기능을 사용하기 위해 필요한 권한을 요청합니다.
- */
-// =====================================================
-// TODO: BLE 권한 요청 함수 구현
-// 
-// private fun requestBlePermissions(context: Context) {
-//     // ActivityResultLauncher를 통해 권한 요청
-//     // 메인 화면 Composable에서는 rememberLauncherForActivityResult를 사용해야 함
-//     // 이 함수는 예시일 뿐, 실제로는 MainScreen Composable 내부에서 구현해야 함
-//     
-//     // val launcher = rememberLauncherForActivityResult(
-//     //     contract = ActivityResultContracts.RequestMultiplePermissions(),
-//     //     onResult = { permissions ->
-//     //         val allGranted = permissions.values.all { it }
-//     //         viewModel.updateBlePermissionStatus(allGranted)
-//     //     }
-//     // )
-//     
-//     // if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-//     //     launcher.launch(
-//     //         arrayOf(
-//     //             android.Manifest.permission.BLUETOOTH_SCAN,
-//     //             android.Manifest.permission.BLUETOOTH_CONNECT
-//     //         )
-//     //     )
-//     // } else {
-//     //     launcher.launch(
-//     //         arrayOf(
-//     //             android.Manifest.permission.ACCESS_FINE_LOCATION
-//     //         )
-//     //     )
-//     // }
-// }
-// =====================================================
-
-/**
- * 블루투스 활성화 상태 확인 함수
- * 블루투스가 활성화되어 있는지 확인합니다.
- */
-// =====================================================
-// TODO: 블루투스 활성화 상태 확인 함수 구현
-// 
-// private fun isBluetoothEnabled(context: Context): Boolean {
-//     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-//     val bluetoothAdapter = bluetoothManager.adapter
-//     return bluetoothAdapter?.isEnabled == true
-// }
-// =====================================================
-
-/**
- * 블루투스 활성화 요청 함수
- * 블루투스가 비활성화되어 있는 경우 활성화를 요청합니다.
- */
-// =====================================================
-// TODO: 블루투스 활성화 요청 함수 구현
-// 
-// private fun requestEnableBluetooth(context: Context) {
-//     // ActivityResultLauncher를 통해 블루투스 활성화 요청
-//     // 메인 화면 Composable에서는 rememberLauncherForActivityResult를 사용해야 함
-//     // 이 함수는 예시일 뿐, 실제로는 MainScreen Composable 내부에서 구현해야 함
-//     
-//     // val launcher = rememberLauncherForActivityResult(
-//     //     contract = ActivityResultContracts.StartActivityForResult(),
-//     //     onResult = { result ->
-//     //         val isEnabled = result.resultCode == Activity.RESULT_OK
-//     //         viewModel.updateBluetoothState(isEnabled)
-//     //     }
-//     // )
-//     
-//     // val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
-//     // launcher.launch(enableBtIntent)
-// }
-// =====================================================
-
-/**
- * BLE 서비스 상태 확인 및 재시작 함수
- * BLE 서비스가 중단되었다면 다시 시작합니다.
- */
-// =====================================================
-// TODO: BLE 서비스 상태 확인 및 재시작 함수 구현
-// 
-// private fun checkAndRestartBleServiceIfNeeded(context: Context, viewModel: MainViewModel) {
-//     // BleServiceManager를 통해 서비스 상태를 확인하고 필요하다면 재시작
-//     // 이 함수는 화면이 다시 활성화될 때 호출됩니다.
-//     
-//     // val bleServiceManager = BleServiceManager.getInstance(context)
-//     // if (!bleServiceManager.isServiceRunning() && viewModel.uiState.value.isBleServiceActive) {
-//     //     bleServiceManager.startBleService()
-//     // }
-// }
-// =====================================================
-
 @Preview(showBackground = true)
 @Composable
 fun MainScreenPreview() {
-    LanternTheme {
-        Surface {
-            MainScreen(navController = rememberNavController())
-        }
+    LanternsTheme {
+        MainScreen(
+            navController = rememberNavController()
+        )
     }
 }
 
@@ -469,32 +284,32 @@ private suspend fun runRippleAnimation(
     rippleAnimatable3: Animatable<Float, *>
 ) {
     coroutineScope {
-        // 첫 번째 리플 애니메이션
+        // 첫 번째 리플 애니메이션 - 더 느리게 확산
         launch {
             rippleAnimatable1.snapTo(0f)
             rippleAnimatable1.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(1500, easing = LinearEasing)
+                animationSpec = tween(1800, easing = LinearEasing) // 지속 시간 증가
             )
         }
         
-        // 두 번째 리플 애니메이션 (딜레이 적용)
+        // 두 번째 리플 애니메이션 (딜레이 적용) - 더 느리게 확산
         launch {
-            delay(300) // 300ms 지연
+            delay(350) // 딜레이 약간 증가
             rippleAnimatable2.snapTo(0f)
             rippleAnimatable2.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(1500, easing = LinearEasing)
+                animationSpec = tween(1800, easing = LinearEasing) // 지속 시간 증가
             )
         }
         
-        // 세 번째 리플 애니메이션 (딜레이 적용)
+        // 세 번째 리플 애니메이션 (딜레이 적용) - 더 느리게 확산
         launch {
-            delay(600) // 600ms 지연
+            delay(700) // 딜레이 약간 증가
             rippleAnimatable3.snapTo(0f)
             rippleAnimatable3.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(1500, easing = LinearEasing)
+                animationSpec = tween(1800, easing = LinearEasing) // 지속 시간 증가
             )
         }
     }
