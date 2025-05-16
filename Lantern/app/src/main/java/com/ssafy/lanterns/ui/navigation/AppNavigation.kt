@@ -20,6 +20,7 @@ import com.ssafy.lanterns.ui.screens.common.UserProfileData
 import com.ssafy.lanterns.ui.screens.login.LoginScreen
 import com.ssafy.lanterns.ui.screens.main.MainScreen
 import com.ssafy.lanterns.ui.screens.mypage.MyPageScreen
+import com.ssafy.lanterns.ui.screens.signup.SignupScreen
 import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIScreen
 import com.ssafy.lanterns.ui.screens.splash.SplashScreen
 import androidx.compose.ui.Modifier

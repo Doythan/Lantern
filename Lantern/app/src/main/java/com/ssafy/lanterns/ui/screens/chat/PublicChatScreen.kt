@@ -1,5 +1,7 @@
 package com.ssafy.lanterns.ui.screens.chat
 
+import android.app.Activity
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,6 +29,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -46,11 +49,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.ssafy.lanterns.utils.PermissionHelper
+import com.ssafy.lanterns.service.ble.advertiser.AdvertiserManager
+import com.ssafy.lanterns.service.ble.scanner.ScannerManager
 import com.ssafy.lanterns.ui.components.ChatMessageBubble
 import com.ssafy.lanterns.ui.components.ChatUser
 import com.ssafy.lanterns.ui.components.NearbyUsersModal
 import com.ssafy.lanterns.ui.theme.*
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -98,7 +107,8 @@ data class ChatMessage(
 @Composable
 fun PublicChatScreen(
     navController: NavController,
-    paddingValues: PaddingValues = PaddingValues()
+    paddingValues: PaddingValues = PaddingValues(0.dp),
+    viewModel: PublicChatScreenViewModel = hiltViewModel()
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val listState = rememberLazyListState()
@@ -109,6 +119,50 @@ fun PublicChatScreen(
     
     // 메시지 전송 가능 상태 (딜레이를 위한 상태 추가)
     var canSendMessage by remember { mutableStateOf(true) }
+    
+    val currentUser by viewModel.currentUser
+    
+    // 객체 생성
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        // PermissionHelper 객체 생성
+        val permissionHelper = PermissionHelper(context as Activity)
+        ScannerManager.init(context as Activity)
+        AdvertiserManager.init(context as Activity)
+
+        // 권한이 없다면 요청
+        if(!permissionHelper.hasPermission()) permissionHelper.requestPermissions(1001);
+        // 있다면
+        else{
+            // 블루투스를 사용자가 켰는지 확인
+            if(permissionHelper.isBluetoothEnabeld()) {
+                // scaning
+                ScannerManager.startScanning(context){ sender, text ->
+                    val newMessage = ChatMessage(
+                        id = messages.size + 1,
+                        sender = sender,
+                        text = text,
+                        time = System.currentTimeMillis(),
+                        isMe = false,
+                        senderProfileId = null,
+                        distance = 0f
+                    )
+                    messages = messages + newMessage
+                }
+                Log.d("dong", "ㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇ")
+            }
+            else Log.d("1234", "연결 되지 않았습니다.")
+        }
+    }
+
+    // 화면이 사라질 때 광고/스캔 정지
+    DisposableEffect(Unit) {
+        onDispose {
+            Log.d("Compose", "💨 PublicChatScreen dispose - stopping BLE")
+            AdvertiserManager.stopAdvertising()
+            ScannerManager.stopScanning()
+        }
+    }
     
     val nearbyUsers = remember {
         listOf(
@@ -138,15 +192,27 @@ fun PublicChatScreen(
     fun sendMessage() {
         if (messageInput.isBlank() || !canSendMessage) return
         
+        val senderName = currentUser?.nickname ?: "나"
+        
         val newMessage = ChatMessage(
             messages.size + 1,
-            "나", // 사용자 이름
+            senderName,
             messageInput.trim(),
             System.currentTimeMillis(),
             true // 내가 보낸 메시지임을 표시
         )
         
         messages = messages + newMessage
+        
+        // BLE 광고 시작
+        val splitList = splitMessageByByteLength(messageInput)
+        AdvertiserManager.startAdvertising(
+            messageList = splitList,
+            email = senderName,
+            activity = context as Activity,
+            state = 0
+        )
+        
         messageInput = ""
         
         // 메시지 전송 후 딜레이 설정 (1.5초)
@@ -336,6 +402,37 @@ fun PublicChatScreenPreview() {
     LanternsTheme {
         PublicChatScreen(navController = NavController(LocalContext.current))
     }
+}
+
+// 현재 날짜 함수
+fun getCurrentTimeFormatted(): String {
+    val now = LocalDateTime.now()
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    return now.format(formatter)
+}
+
+// 메시지를 바이트 단위로 분할하는 함수
+fun splitMessageByByteLength(message: String, maxBytes: Int = 17): List<String> {
+    val result = mutableListOf<String>()
+    var current = ""
+    var currentBytes = 0
+
+    for (char in message) {
+        val charBytes = char.toString().toByteArray(Charsets.UTF_8)
+        if (currentBytes + charBytes.size > maxBytes) {
+            result.add(current)
+            current = ""
+            currentBytes = 0
+        }
+        current += char
+        currentBytes += charBytes.size
+    }
+
+    if (current.isNotEmpty()) {
+        result.add(current)
+    }
+
+    return result
 }
 
 // 타임스탬프를 "오전 10:30" 형식으로 변환하는 함수
