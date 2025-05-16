@@ -74,7 +74,7 @@ class MainViewModel @Inject constructor(
      *  AI 다이얼로그 제어
      * ================================================== */
 
-    /** “헤이 랜턴” 감지 시 호출 */
+    /** "헤이 랜턴" 감지 시 호출 */
     fun activateAI() {
         val now = System.currentTimeMillis()
         if (now - lastAiActivationTime < AI_ACTIVATION_DEBOUNCE_MS) {
@@ -112,18 +112,18 @@ class MainViewModel @Inject constructor(
 
         // 모킹용 사람 리스트
         val predefinedPeople = listOf(
-            NearbyPerson(1, 42f,  45f, 0.85f),   // 0~100 m
-            NearbyPerson(2, 87f, 135f, 0.75f),
-            NearbyPerson(3,154f, 210f, 0.55f),   // 100~300 m
-            NearbyPerson(4,267f, 315f, 0.45f),
-            NearbyPerson(5,345f,  90f, 0.35f),   // 300 m+
-            NearbyPerson(6,478f, 270f, 0.25f)
+            NearbyPerson(id = 1, distance = 42f, angle = 45f, signalStrength = 0.85f),   // 0~100 m
+            NearbyPerson(id = 2, distance = 87f, angle = 135f, signalStrength = 0.75f),
+            NearbyPerson(id = 3, distance = 154f, angle = 210f, signalStrength = 0.55f),   // 100~300 m
+            NearbyPerson(id = 4, distance = 267f, angle = 315f, signalStrength = 0.45f),
+            NearbyPerson(id = 5, distance = 345f, angle = 90f, signalStrength = 0.35f),   // 300 m+
+            NearbyPerson(id = 6, distance = 478f, angle = 270f, signalStrength = 0.25f)
         )
 
         scanningJob = viewModelScope.launch {
             val discovered = mutableListOf<NearbyPerson>()
 
-            // 가까운 사람부터 하나씩 “발견”
+            // 가까운 사람부터 하나씩 "발견"
             for (person in predefinedPeople.sortedBy { it.distance }) {
                 delay(800)
                 discovered.add(person)

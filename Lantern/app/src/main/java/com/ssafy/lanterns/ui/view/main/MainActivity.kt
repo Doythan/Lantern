@@ -31,7 +31,7 @@ import com.ssafy.lanterns.service.WakeWordService
 import com.ssafy.lanterns.ui.screens.App           // App.kt의 루트 Composable
 import com.ssafy.lanterns.ui.screens.main.MainViewModel
 import com.ssafy.lanterns.ui.screens.mypage.MyPageViewModel
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.LanternsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -122,7 +122,7 @@ class MainActivity : ComponentActivity() {
             val userViewModel: MyPageViewModel = hiltViewModel()
             val userState by userViewModel.uiState.collectAsState()
 
-            LanternTheme {      // 앱 전체 테마
+            LanternsTheme(darkTheme = true) {      // 다크 테마 강제 적용
                 Surface(modifier = Modifier.fillMaxSize()) {
                     App()       // App.kt의 루트 Composable
                 }
