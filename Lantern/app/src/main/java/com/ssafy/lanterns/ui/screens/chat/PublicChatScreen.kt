@@ -121,6 +121,7 @@ fun PublicChatScreen(
     var canSendMessage by remember { mutableStateOf(true) }
     
     val currentUser by viewModel.currentUser
+    val messages by viewModel.messages
     
     // 객체 생성
     val context = LocalContext.current
@@ -139,7 +140,7 @@ fun PublicChatScreen(
                 // scaning
                 ScannerManager.startScanning(context){ sender, text ->
                     val newMessage = ChatMessage(
-                        id = messages.size + 1,
+                        id = viewModel.getNextMessageId(),
                         sender = sender,
                         text = text,
                         time = System.currentTimeMillis(),
@@ -147,12 +148,15 @@ fun PublicChatScreen(
                         senderProfileId = null,
                         distance = 0f
                     )
-                    messages = messages + newMessage
+                    viewModel.addMessage(newMessage)
                 }
                 Log.d("dong", "ㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇ")
             }
             else Log.d("1234", "연결 되지 않았습니다.")
         }
+
+        // 초기 메시지 설정 (ViewModel)
+        viewModel.initializeDefaultMessages()
     }
 
     // 화면이 사라질 때 광고/스캔 정지
@@ -175,34 +179,20 @@ fun PublicChatScreen(
         )
     }
     
-    var messages by remember {
-        mutableStateOf(
-            listOf(
-                ChatMessage(1, "시스템", "모두의 광장에 오신 것을 환영합니다. 주변 사람들과 자유롭게 대화해보세요!", System.currentTimeMillis() - 3600000, false),
-                ChatMessage(2, "김싸피", "안녕하세요! 반갑습니다~ 오늘 날씨가 정말 좋네요", System.currentTimeMillis() - 1800000, false),
-                ChatMessage(3, "이테마", "네 맞아요! 오늘 같은 날은 산책하기 좋을 것 같아요", System.currentTimeMillis() - 1500000, false),
-                ChatMessage(4, "박비트", "저는 지금 카페에서 코딩하고 있어요 ☕", System.currentTimeMillis() - 1200000, false),
-                ChatMessage(5, "최앱", "와~ 저도 노트북 들고 카페 가려고 했는데! 어느 카페인가요?", System.currentTimeMillis() - 900000, false),
-                ChatMessage(6, "정리액트", "여기 사람들 다 개발자인가요?", System.currentTimeMillis() - 600000, false),
-                ChatMessage(7, "한고민", "저는 디자이너입니다~ 혹시 협업할 개발자 구하시나요?", System.currentTimeMillis() - 300000, false)
-            )
-        )
-    }
-    
     fun sendMessage() {
         if (messageInput.isBlank() || !canSendMessage) return
         
         val senderName = currentUser?.nickname ?: "나"
         
         val newMessage = ChatMessage(
-            messages.size + 1,
+            viewModel.getNextMessageId(),
             senderName,
             messageInput.trim(),
             System.currentTimeMillis(),
             true // 내가 보낸 메시지임을 표시
         )
         
-        messages = messages + newMessage
+        viewModel.addMessage(newMessage)
         
         // BLE 광고 시작
         val splitList = splitMessageByByteLength(messageInput)
