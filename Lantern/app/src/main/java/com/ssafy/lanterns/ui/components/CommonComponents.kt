@@ -113,8 +113,8 @@ fun ProfileAvatar(
     name: String? = "Profile Avatar",
     size: Dp = 48.dp,
     modifier: Modifier = Modifier,
-    borderColor: Color = MaterialTheme.colorScheme.primary, 
-    borderGradientEnd: Color = MaterialTheme.colorScheme.secondary, 
+    borderColor: Color = Color.White,  // 기본 테두리 색상을 흰색으로 변경
+    borderGradientEnd: Color = Color.White,  // 그라데이션 끝 색상도 흰색으로 통일
     hasBorder: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
@@ -122,29 +122,29 @@ fun ProfileAvatar(
         .size(size)
         .clip(CircleShape)
         .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-
+    
     Box(
         modifier = modifier.then(
             if (hasBorder) {
                 imageModifier
                     .background(
-                        brush = Brush.linearGradient(
-                            colors = listOf(borderColor, borderGradientEnd)
-                        )
+                        color = borderColor  // 단색 테두리 적용 (기본 흰색)
                     )
-                    .padding(2.dp) 
-                    .background(MaterialTheme.colorScheme.surface) 
-                    .clip(CircleShape) 
+                    .padding(2.dp)  // 테두리 두께
+                    .clip(CircleShape)  // 이미지를 원형으로 유지
+                    .background(MaterialTheme.colorScheme.background)  // 내부 배경색
             } else {
-                imageModifier.background(MaterialTheme.colorScheme.surface) 
+                imageModifier
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.background)
             }
         )
     ) {
         Image(
             painter = painterResource(id = getProfileImageResId(profileId)),
-            contentDescription = name ?: "Profile image for ID $profileId", 
-            modifier = Modifier.fillMaxSize().clip(CircleShape), 
-            contentScale = ContentScale.Crop
+            contentDescription = name ?: "Profile image for ID $profileId",
+            modifier = Modifier.fillMaxSize().clip(CircleShape),  // 이미지도 원형으로 클립
+            contentScale = ContentScale.Crop  // 이미지 비율 유지하며 꽉 채우기
         )
     }
 }

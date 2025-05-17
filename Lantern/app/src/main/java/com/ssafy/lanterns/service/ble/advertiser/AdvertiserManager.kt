@@ -27,8 +27,10 @@ object AdvertiserManager{
     private var lastMessage: String = ""
     private var lastState: Int = 0
 
-
-
+    // 랜턴 앱 전용 상수
+    private const val LANTERN_MANUFACTURER_ID_MESSAGE = 0xFFFF
+    private const val LANTERN_MANUFACTURER_ID_EMAIL = 0xFFFE
+    private val LANTERN_APP_UUID = UUID.fromString("12345678-1234-1234-1234-1234567890ab")
 
     fun init(activity: Activity) {
         val bluetoothManager = activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
@@ -48,101 +50,84 @@ object AdvertiserManager{
         var advertiseData: AdvertiseData ?= null
         var scanResponseData : AdvertiseData ?= null
 
-        // 랜턴 UUID
-//        val SERVICE_UUID = UUID.fromString("12345678-1234-1234-1234-1234567890ab")
-
-
-
-        var combined : String = "init"
         // 최초로 데이터를 보낼 때
         if(state == 0) {
-            // message의 uuid
+            // 메시지 고유 UUID 생성 (8자리 16진수)
             val uuid = UUID.randomUUID().toString().substring(0, 8)
             val adString = messageList.getOrNull(0) ?: ""
             val scString = messageList.getOrNull(1) ?: ""
-            Log.d("adString", "${adString}, ${scString}")
+            Log.d("AdvertiserManager", "메시지 전송: ${adString}, ${scString}")
             val adCombined = "$uuid|$adString"
             val scCombined = "$email|$scString"
             val adBytes = adCombined.toByteArray()
             val scBytes = scCombined.toByteArray()
 
-
-            // 중복 처리
+            // 내 기기에서도 메시지 수신시 중복 방지를 위한 처리
             ScannerManager.updateChatSet(uuid, adCombined + scCombined, activity)
 
+            // 메시지 데이터 광고
             advertiseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addManufacturerData(0xFFFF, adBytes)
+                .addManufacturerData(LANTERN_MANUFACTURER_ID_MESSAGE, adBytes)
                 .build()
 
+            // 이메일 및 추가 데이터 응답
             scanResponseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addManufacturerData(0xFFFE, scBytes)
+                .addManufacturerData(LANTERN_MANUFACTURER_ID_EMAIL, scBytes)
                 .build()
         }
-        // 릴레이인 경우
+        // 메시지 릴레이인 경우
         else{
             advertiseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addManufacturerData(0xFFFF, messageList.getOrNull(0)?.toByteArray())
+                .addManufacturerData(LANTERN_MANUFACTURER_ID_MESSAGE, messageList.getOrNull(0)?.toByteArray())
                 .build()
 
             scanResponseData = AdvertiseData.Builder()
                 .setIncludeDeviceName(false)
-                .addManufacturerData(0xFFFE, messageList.getOrNull(1)?.toByteArray())
+                .addManufacturerData(LANTERN_MANUFACTURER_ID_EMAIL, messageList.getOrNull(1)?.toByteArray())
                 .build()
         }
 
-        val data = email.toByteArray()
-
-        // scan 응답 데이터
-        // email 값
-
-        // Advertising 시 소량의 데이터
-//            val advertiseData = AdvertiseData.Builder()
-//                .setIncludeDeviceName(false)
-//                .addManufacturerData(0xFFFF, data)
-//                .build()
-
-        // advertise 성공 실패 코드
+        // 광고 콜백
         advertiseCallback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                 super.onStartSuccess(settingsInEffect)
-                Log.d("onStartSuccess", "${messageList}")
+                Log.d("AdvertiserManager", "광고 시작 성공: ${messageList}")
             }
 
             override fun onStartFailure(errorCode: Int) {
                 super.onStartFailure(errorCode)
-                Log.d("실패?", "${errorCode}")
+                Log.e("AdvertiserManager", "광고 시작 실패: 에러 코드 ${errorCode}")
             }
         }
+        
+        // 권한 확인 후 광고 시작
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED) {
-            bluetoothLeAdvertiser?.startAdvertising(settings, advertiseData, scanResponseData,advertiseCallback)
-            // 재시작
-//            restartHandler.postDelayed({
-//                Log.d("광고 재시작", "${lastMessage}, ${lastState}")
-//                if(state == 0)
-//                    startAdvertising(combined,email ,activity, state)
-//                else startAdvertising(message,email ,activity, state)
-//            }, 1 * 60 * 1000)
-
+            bluetoothLeAdvertiser?.startAdvertising(settings, advertiseData, scanResponseData, advertiseCallback)
+            
+            // 광고는 30초 후 자동 중단 (전력 소모 방지)
+            restartHandler.postDelayed({
+                stopAdvertising()
+            }, 30 * 1000) // 30초
         } else {
             Log.e("BLE", "BLUETOOTH_ADVERTISE 권한이 없습니다. Advertising을 시작할 수 없습니다.")
         }
     }
 
-    // 아까 보냈던거 다시 안보내려고
-    // stop 을 해줘야됨
+    // 광고 중지 함수
     fun stopAdvertising(){
         advertiseCallback?.let{
             try {
                 bluetoothLeAdvertiser?.stopAdvertising(it)
+                Log.d("AdvertiserManager", "광고 중지")
             } catch (e: SecurityException){
-                Log.e("권한문제", "하기싷다 ")
+                Log.e("AdvertiserManager", "광고 중지 실패: ${e.message}")
             }
         }
 
         advertiseCallback = null
-        restartHandler.removeCallbacksAndMessages(null) // 재시작 제거
+        restartHandler.removeCallbacksAndMessages(null) // 재시작 타이머 제거
     }
 }

@@ -87,22 +87,35 @@ fun ChatMessageBubble(
         verticalAlignment = Alignment.Bottom
     ) {
         if (!isMe) {
-            Box(modifier = Modifier.clip(CircleShape)) {
-                ProfileAvatar(
-                    profileId = senderProfileId ?: 1, 
-                    name = senderName, 
-                    size = 36.dp,
-                    borderColor = avatarBorderColor, 
-                    hasBorder = true,
-                    onClick = if (navController != null && senderProfileId != null) {
-                        {
-                            val route = AppDestinations.PROFILE_ROUTE
-                                .replace("{userId}", senderProfileId.toString())
-                                .replace("{name}", senderName)
-                                .replace("{distance}", "${distance.toInt()}m")
-                            navController.navigate(route)
-                        }
-                    } else null
+            // 프로필 아바타를 직접 구현하여 흰색 테두리 적용
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(
+                        color = Color.White, // 흰색 테두리
+                        shape = CircleShape
+                    )
+                    .padding(2.dp) // 테두리 두께
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.background)
+                    .clickable(
+                        enabled = navController != null && senderProfileId != null,
+                        onClick = if (navController != null && senderProfileId != null) {
+                            {
+                                val route = AppDestinations.PROFILE_ROUTE
+                                    .replace("{userId}", senderProfileId.toString())
+                                    .replace("{name}", senderName)
+                                    .replace("{distance}", "${distance.toInt()}m")
+                                navController.navigate(route)
+                            }
+                        } else ({})
+                    )
+            ) {
+                Image(
+                    painter = painterResource(id = getProfileImageResId(senderProfileId ?: 1)),
+                    contentDescription = "프로필 이미지: $senderName",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -155,19 +168,33 @@ fun ChatMessageBubble(
         
         if (isMe) {
             Spacer(modifier = Modifier.width(8.dp))
-            Box(modifier = Modifier.clip(CircleShape)) {
-                ProfileAvatar(
-                    profileId = senderProfileId ?: 0, 
-                    name = "나", 
-                    size = 28.dp,
-                    borderColor = avatarBorderColor,
-                    hasBorder = true,
-                    onClick = if (navController != null && senderProfileId != null) { 
-                        {
-                            // val route = ... 내 프로필 화면으로
-                            // navController.navigate(route)
-                        }
-                    } else null
+            // 프로필 아바타를 직접 구현하여 흰색 테두리 적용
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .background(
+                        color = Color.White, // 흰색 테두리
+                        shape = CircleShape
+                    )
+                    .padding(2.dp) // 테두리 두께
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.background)
+                    .clickable(
+                        enabled = navController != null && senderProfileId != null,
+                        onClick = if (navController != null && senderProfileId != null) {
+                            {
+                                // 내 프로필 화면으로
+                                // val route = ...
+                                // navController.navigate(route)
+                            }
+                        } else ({})
+                    )
+            ) {
+                Image(
+                    painter = painterResource(id = getProfileImageResId(senderProfileId ?: 0)),
+                    contentDescription = "내 프로필 이미지",
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop
                 )
             }
         }

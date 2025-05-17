@@ -62,6 +62,13 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 
 // 메시지 데이터 모델
 data class ChatMessage(
@@ -120,11 +127,57 @@ fun PublicChatScreen(
     // 메시지 전송 가능 상태 (딜레이를 위한 상태 추가)
     var canSendMessage by remember { mutableStateOf(true) }
     
+    // 주변 사용자 목록
+    val nearbyUsers = remember { mutableStateListOf<ChatUser>() }
+    
     val currentUser by viewModel.currentUser
     val messages by viewModel.messages
     
     // 객체 생성
     val context = LocalContext.current
+    
+    // 메시지 전송 함수 정의
+    fun sendMessage() {
+        if (messageInput.isBlank() || !canSendMessage) return
+        
+        val senderName = currentUser?.nickname ?: "나"
+        
+        val newMessage = ChatMessage(
+            viewModel.getNextMessageId(),
+            senderName,
+            messageInput.trim(),
+            System.currentTimeMillis(),
+            true // 내가 보낸 메시지임을 표시
+        )
+        
+        // 메시지 추가 (UI에 메시지 표시)
+        viewModel.addMessage(newMessage)
+        
+        // 메시지 바이트 길이 제한 확인 및 분할
+        val splitList = splitMessageByByteLength(messageInput)
+        
+        // 로그 확인
+        Log.d("PublicChat", "메시지 전송: $messageInput, 분할된 메시지: ${splitList.size}개 패킷")
+        
+        // BLE 광고 시작 - 메시지 브로드캐스트
+        AdvertiserManager.startAdvertising(
+            messageList = splitList,
+            email = senderName,
+            activity = context as Activity,
+            state = 0
+        )
+        
+        // 입력란 초기화
+        messageInput = ""
+        
+        // 메시지 전송 후 딜레이 설정 (1.5초)
+        canSendMessage = false
+        coroutineScope.launch {
+            delay(1500) // 1.5초 딜레이
+            canSendMessage = true
+        }
+    }
+    
     LaunchedEffect(Unit) {
         // PermissionHelper 객체 생성
         val permissionHelper = PermissionHelper(context as Activity)
@@ -137,8 +190,9 @@ fun PublicChatScreen(
         else{
             // 블루투스를 사용자가 켰는지 확인
             if(permissionHelper.isBluetoothEnabeld()) {
-                // scaning
+                // 스캔 시작 - 메시지와 사용자 정보 수신
                 ScannerManager.startScanning(context){ sender, text ->
+                    // 메시지 수신 처리
                     val newMessage = ChatMessage(
                         id = viewModel.getNextMessageId(),
                         sender = sender,
@@ -149,10 +203,21 @@ fun PublicChatScreen(
                         distance = 0f
                     )
                     viewModel.addMessage(newMessage)
+                    
+                    // 발신자가 주변 사용자 목록에 없으면 추가
+                    if (sender != "Unknown" && nearbyUsers.none { it.name == sender }) {
+                        nearbyUsers.add(
+                            ChatUser(
+                                id = nearbyUsers.size + 1,
+                                name = sender,
+                                distance = 100f, // 기본 거리
+                                messageCount = 1f // 기본 메시지 개수
+                            )
+                        )
+                    }
                 }
-                Log.d("dong", "ㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇㅇ")
             }
-            else Log.d("1234", "연결 되지 않았습니다.")
+            else Log.d("1234", "블루투스가 활성화되지 않았습니다.")
         }
 
         // 초기 메시지 설정 (ViewModel)
@@ -168,51 +233,6 @@ fun PublicChatScreen(
         }
     }
     
-    val nearbyUsers = remember {
-        listOf(
-            ChatUser(1, "김싸피", 80f, 5f),
-            ChatUser(2, "이테마", 150f, 10f),
-            ChatUser(3, "박비트", 250f, 3f),
-            ChatUser(4, "최앱", 300f, 7f),
-            ChatUser(5, "정리액트", 350f, 2f),
-            ChatUser(6, "한고민", 400f, 8f)
-        )
-    }
-    
-    fun sendMessage() {
-        if (messageInput.isBlank() || !canSendMessage) return
-        
-        val senderName = currentUser?.nickname ?: "나"
-        
-        val newMessage = ChatMessage(
-            viewModel.getNextMessageId(),
-            senderName,
-            messageInput.trim(),
-            System.currentTimeMillis(),
-            true // 내가 보낸 메시지임을 표시
-        )
-        
-        viewModel.addMessage(newMessage)
-        
-        // BLE 광고 시작
-        val splitList = splitMessageByByteLength(messageInput)
-        AdvertiserManager.startAdvertising(
-            messageList = splitList,
-            email = senderName,
-            activity = context as Activity,
-            state = 0
-        )
-        
-        messageInput = ""
-        
-        // 메시지 전송 후 딜레이 설정 (1.5초)
-        canSendMessage = false
-        coroutineScope.launch {
-            delay(1500) // 1.5초 딜레이
-            canSendMessage = true
-        }
-    }
-    
     // 메시지 스크롤 효과
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -224,9 +244,9 @@ fun PublicChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection)
-            .imePadding() // 키보드가 올라올 때 입력 영역이 키보드 위로 올라오도록 설정
-            .systemBarsPadding() // 시스템 바(상태바, 내비게이션 바)를 고려한 패딩 적용
-            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding(), // systemBarsPadding() 대신 statusBarsPadding()만 적용
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        color = MaterialTheme.colorScheme.background
     ) {
         Box(
             modifier = Modifier
@@ -266,7 +286,8 @@ fun PublicChatScreen(
                                     tint = MaterialTheme.colorScheme.secondary
                                 )
                                 Text(
-                                    text = nearbyUsers.size.toString(),
+                                    // 현재 사용자(나) + 다른 주변 사용자 표시
+                                    text = (nearbyUsers.size + 1).toString(),
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
@@ -316,7 +337,8 @@ fun PublicChatScreen(
                     message = messageInput,
                     onMessageChange = { messageInput = it },
                     onSendClick = { sendMessage() },
-                    isSendEnabled = canSendMessage
+                    isSendEnabled = canSendMessage,
+                    modifier = Modifier
                 )
             }
             
@@ -344,7 +366,12 @@ fun PublicChatInputRow(
     modifier: Modifier = Modifier,
     isSendEnabled: Boolean = true
 ) {
-    Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .navigationBarsPadding() // 내비게이션 바 패딩 유지
+            .imePadding() // exclude 대신 단순 imePadding() 적용
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()

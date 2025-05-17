@@ -1,5 +1,6 @@
 package com.ssafy.lanterns.ui.screens.chat
 
+import android.util.Log
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
@@ -64,6 +65,13 @@ import androidx.compose.ui.draw.shadow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.consumeWindowInsets
 
 // 더미 메시지 데이터 모델
 data class DirectMessage(
@@ -194,8 +202,7 @@ fun DirectChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection)
-            .imePadding() // 키보드가 올라올 때 입력 영역이 키보드 위로 올라오도록 설정
-            .systemBarsPadding(), // 시스템 바(상태바, 내비게이션 바)를 고려한 패딩 적용
+            .statusBarsPadding(), // statusBarsPadding()만 유지
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
@@ -259,7 +266,8 @@ fun DirectChatScreen(
                         }
                     }
                 },
-                isSendEnabled = canSendMessage
+                isSendEnabled = canSendMessage,
+                modifier = Modifier
             )
         }
     ) { innerPadding -> 
@@ -323,7 +331,12 @@ fun DirectMessageInputRow(
     modifier: Modifier = Modifier,
     isSendEnabled: Boolean = true
 ) {
-    Column(modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
+    Column(
+        modifier = modifier
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .navigationBarsPadding() // 내비게이션 바 패딩 유지
+            .imePadding() // exclude 대신 단순 imePadding() 적용
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -461,7 +474,7 @@ fun DirectChatScreenContentForPreview(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection)
-            .imePadding(),
+            .statusBarsPadding(), // statusBarsPadding()만 유지
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(

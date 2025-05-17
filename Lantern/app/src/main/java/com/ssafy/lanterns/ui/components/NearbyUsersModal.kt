@@ -32,7 +32,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.ssafy.lanterns.ui.components.ProfileAvatar
 import com.ssafy.lanterns.ui.navigation.AppDestinations
 import com.ssafy.lanterns.ui.theme.*
 import com.ssafy.lanterns.utils.getConnectionColorByDistance
@@ -75,11 +74,11 @@ fun NearbyUsersModal(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            // 배경 어둡게 처리 (탭해서 닫기 가능)
+            // 배경 반투명하게 처리 (탭해서 닫기 가능)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.scrim)
+                    .background(Color.Black.copy(alpha = 0.4f)) // 불투명도 40%로 설정하여 원래 화면이 보이도록 함
                     .clickable { onDismiss() }
             )
             
@@ -209,7 +208,7 @@ fun ChatUserItem(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${user.distance.toInt()}m | 메시지 ${user.messageCount.toInt()}개",
+                        text = "${user.distance.toInt()}m",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
