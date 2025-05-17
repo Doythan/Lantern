@@ -1,5 +1,7 @@
 package com.ssafy.lanterns.service
 
+
+import com.ssafy.lanterns.BuildConfig
 import ai.picovoice.porcupine.PorcupineException
 import ai.picovoice.porcupine.PorcupineManager
 import ai.picovoice.porcupine.PorcupineManagerCallback
@@ -17,6 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.ssafy.lanterns.R
+import com.ssafy.lanterns.utils.WakeWordUtils
 // import com.ssafy.lanterns.ui.view.main.MainActivity // 서비스에서 직접 Activity 참조는 좋지 않음
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -29,9 +32,9 @@ class WakeWordService : Service() {
 
     private var porcupineManager: PorcupineManager? = null
 
-    private val ACCESS_KEY = "yDavJ4DBaKni68lXNor2vRSSwSwPgAjh8wvgMTJ62e7SkLdoOT2eOA==" // 실제 키는 안전하게 관리하세요.
+    private val ACCESS_KEY = BuildConfig.PV_ACCESS_KEY
 
-    private val KEYWORD_ASSET_FILENAME = "hey-lantern_en_android_v3_0_0.ppn"
+    private val KEYWORD_ASSET_FILENAME =  BuildConfig.PV_KEYWORD_FILE
     private val MODEL_ASSET_FILENAME = "porcupine_params.pv"
 
     private val INTERNAL_KEYWORD_FILENAME = "wakeword_keyword.ppn"
@@ -79,20 +82,31 @@ class WakeWordService : Service() {
     }
 
     override fun onCreate() {
+        // ── 모델 파일 없으면 서비스 즉시 중단 ──
+        if (!WakeWordUtils.hasModelFiles(this)) {
+            Log.w("WakeWordService", "모델 파일(.pv/.ppn) 미발견 → 서비스 중지")
+            stopSelf()
+            return
+        }
+
         super.onCreate()
         Log.d("WakeWordService", "onCreate() 호출됨")
-        // Log.d("WakeWordService", "Access Key (앞 5자리): ${ACCESS_KEY.take(5)}...") // 실제 키 로깅은 보안상 주의
+        // 실제 키 로깅은 보안상 주의
+        // Log.d("WakeWordService", "Access Key (앞 5자리): ${BuildConfig.PV_ACCESS_KEY.take(5)}...")
 
-        startForegroundServiceNotification() // 포그라운드 서비스 시작
+        startForegroundServiceNotification() // 포그라운드 알림 띄우기
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        // 마이크 권한 확인
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             Log.e("WakeWordService", "RECORD_AUDIO 권한 없음. 서비스 중단.")
-            stopSelf() // 권한 없으면 서비스 즉시 중단
+            stopSelf()
             return
         }
         Log.d("WakeWordService", "RECORD_AUDIO 권한 확인됨.")
 
-        initializePorcupine()
+        initializePorcupine()  // Porcupine 초기화
     }
 
     private fun initializePorcupine() {
