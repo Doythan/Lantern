@@ -29,7 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.ssafy.lanterns.service.WakeWordService
 import com.ssafy.lanterns.ui.screens.App
-import com.ssafy.lanterns.ui.theme.LanternTheme
+import com.ssafy.lanterns.ui.theme.LanternsTheme
 import com.ssafy.lanterns.ui.screens.main.MainViewModel
 import com.ssafy.lanterns.utils.WakeWordUtils
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,36 +44,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var requestOverlayPermissionLauncher: ActivityResultLauncher<Intent>
 
-    // 일반 권한(RECORD_AUDIO, POST_NOTIFICATIONS)
-    private val requestMultiplePermissionsLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
-            var allRequiredGranted = true
-
-            // RECORD_AUDIO
-            permissions[Manifest.permission.RECORD_AUDIO]?.let { granted ->
-                if (granted) {
-                    Log.d("MainActivity", "RECORD_AUDIO 권한 허용")
-                } else {
-                    Log.w("MainActivity", "RECORD_AUDIO 권한 거부")
-                    Toast.makeText(this,
-                        "마이크 권한이 거부되어 웨이크워드 기능을 사용할 수 없습니다.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                    allRequiredGranted = false
-                }
-            }
-
-            // POST_NOTIFICATIONS (Android 13+)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                permissions[Manifest.permission.POST_NOTIFICATIONS]?.let { granted ->
-                    if (!granted) {
-                        Log.w("MainActivity", "POST_NOTIFICATIONS 권한 거부")
-                    }
-                }
-            }
-
-            if (allRequiredGranted) checkAndRequestOverlayPermission()
-        }
 
     /* -------------------------------------------------- *
      * 웨이크워드 브로드캐스트 수신
@@ -123,7 +93,7 @@ class MainActivity : ComponentActivity() {
         if (!WakeWordUtils.hasModelFiles(this)) {
             Log.w("MainActivity", "모델 파일(.pv/.ppn) 미발견 → WakeWord 기능 비활성화")
             setContent {
-                LanternTheme {
+                LanternsTheme  {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         App()  // UI만 띄우고 서비스·권한 요청 없이 종료
                     }
@@ -148,7 +118,7 @@ class MainActivity : ComponentActivity() {
 
         /* --- Compose UI --- */
         setContent {
-            LanternTheme {
+            LanternsTheme  {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     App()
                 }
@@ -168,6 +138,8 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "wakeWordReceiver 해제")
     }
 
+
+
     /* ==================================================
      *  권한 / Overlay 처리
      * ================================================== */
@@ -184,7 +156,7 @@ class MainActivity : ComponentActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
@@ -232,10 +204,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        LocalBroadcastManager.getInstance(this)
-            .unregisterReceiver(wakeWordReceiver)
-        Log.d("MainActivity", "wakeWordReceiver 등록 해제됨.")
-    }
+
 }
