@@ -65,16 +65,23 @@ object ScannerManager {
             return
         }
 
-        // 랜턴 UUID
-        val SERVICE_UUID = UUID.fromString("12345678-1234-1234-1234-1234567890ab")
+        // 랜턴 앱 고유 UUID - 이 앱을 설치한 사용자 간 통신을 위한 식별자
+        val LANTERN_APP_UUID = UUID.fromString("12345678-1234-1234-1234-1234567890ab")
 
-//        val scanFilter = ScanFilter.Builder()
-//            .setServiceUuid(ParcelUuid(SERVICE_UUID)) // 특정 UUID만 필터링
-//            .build()
-//
-//        val scanFilters = listOf(scanFilter)
+        // 제조사 ID - 랜턴 앱 전용 식별자 (0xFFFF, 0xFFFE 사용)
+        val LANTERN_MANUFACTURER_ID_MESSAGE = 0xFFFF
+        val LANTERN_MANUFACTURER_ID_EMAIL = 0xFFFE
 
-        val scanFilters = emptyList<ScanFilter>()
+        // ScanFilter를 사용하여 특정 제조사 ID만 필터링
+        val scanFilter1 = ScanFilter.Builder()
+            .setManufacturerData(LANTERN_MANUFACTURER_ID_MESSAGE, null)
+            .build()
+            
+        val scanFilter2 = ScanFilter.Builder()
+            .setManufacturerData(LANTERN_MANUFACTURER_ID_EMAIL, null)
+            .build()
+            
+        val scanFilters = listOf(scanFilter1, scanFilter2)
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) // 빠른 반응 모드
@@ -85,8 +92,8 @@ object ScannerManager {
             override fun onScanResult(callbackType: Int, result: ScanResult?) {
                 super.onScanResult(callbackType, result)
                 result?.let { scanResult ->
-                    val menufacturerData = scanResult.scanRecord?.getManufacturerSpecificData(0xFFFF)
-                    val emailData = scanResult.scanRecord?.getManufacturerSpecificData(0xFFFE)
+                    val menufacturerData = scanResult.scanRecord?.getManufacturerSpecificData(LANTERN_MANUFACTURER_ID_MESSAGE)
+                    val emailData = scanResult.scanRecord?.getManufacturerSpecificData(LANTERN_MANUFACTURER_ID_EMAIL)
 
                     if(menufacturerData == null) return
 
@@ -103,49 +110,49 @@ object ScannerManager {
                     combined?.let{
                         val adParts = it.split("|", limit=2)
                         val scParts = email?.split("|", limit=2)
-                        if(adParts?.getOrNull(0) == "dbd26aba" || adParts?.getOrNull(0) == "78cd2d91" || adParts?.getOrNull(0) == "a16f6ca2" || adParts?.getOrNull(0) == "e145b0f0" || adParts?.getOrNull(0) == "d69739aa" || adParts?.getOrNull(0) == "dbd26aba" || adParts?.getOrNull(0) == "83000176" || adParts?.getOrNull(0) == "78cd2d91"){
-                            chatSet.add(adParts?.getOrNull(0)?:"unknown")
-                            saveChatSet(activity)
-                        }
+                        
+                        // 랜턴 앱의 메시지 형식 검증 (UUID|메시지 형식인지 확인)
                         if(adParts.size == 2){
                             val uuid = adParts[0]
                             val admessage = adParts[1]
                             val email = scParts?.getOrNull(0)
                             val scmessage = scParts?.getOrNull(1)
 
-                            // 이미 받은 uuid면
-                            if(chatSet.contains(uuid)){
-                                Log.d("중복", "이미받았습니다.")
+                            // 검증: UUID가 올바른 형식인지 확인 (UUID 형식 검증)
+                            if (!isValidUUID(uuid)) {
+                                Log.d("UUID검증", "유효하지 않은 UUID 형식: $uuid")
                                 return
                             }
-                            val fullMessage = admessage + scmessage
 
+                            // 이미 받은 uuid면
+                            if(chatSet.contains(uuid)){
+                                Log.d("중복", "이미 수신한 메시지: $uuid")
+                                return
+                            }
+                            
+                            val fullMessage = if (scmessage != null) {
+                                admessage + scmessage
+                            } else {
+                                admessage
+                            }
+
+                            // UUID를 기록하여 중복 메시지 수신 방지
                             chatSet.add(uuid)
                             saveChatSet(activity)
 
-                            onMessageReceived(email?:"UnKnown", fullMessage)
-
-                            Log.d("onScanResult", "${fullMessage}")
+                            // 메시지 수신 콜백 호출
+                            Log.d("ScannerManager", "메시지 수신: 발신자=$email, 내용=$fullMessage")
+                            onMessageReceived(email?:"Unknown", fullMessage)
+                            
+                            // 릴레이 코드 - 내가 받은 메시지를 다른 사용자에게 전달
+                            val safeCombined = combined ?: ""
+                            val safeEmail = emailText ?: ""
+                            val dataList = listOf(safeCombined, safeEmail)
+                            AdvertiserManager.startAdvertising(dataList, safeEmail, activity, 1)
                         }
-
-                        val safeCombined = combined ?: ""
-                        val safeEmail = emailText ?: ""
-
-                        val dataList = listOf(safeCombined, safeEmail)
-
-
-                        // 릴레이 코드
-                        AdvertiserManager.startAdvertising(dataList,emailText ,activity, 1)
                     }
 
-//                    restartHandler.postDelayed({
-//                        stopScanning()
-//                        startScanning(activity, onMessageReceived)
-//                    }, 1 * 60 * 1000)
-
-
                     Log.d("주소", "${scanResult.device.address}")
-
                 }
                 Log.d("스캔성공", "스캔 성공")
             }
@@ -157,17 +164,17 @@ object ScannerManager {
         }
 
         try {
-                        bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
-            } catch (e: SecurityException){
-                Log.e("권한문제", "하기싷다 ")
-            }
+            bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
+        } catch (e: SecurityException){
+            Log.e("권한문제", "하기싷다 ")
+        }
 
-            // ✅ 여기에 1분마다 반복적으로 재시작 루프를 등록합니다.
-            restartHandler.postDelayed(object : Runnable {
-                override fun run() {
-                    Log.d("주기적으로", "🔄 주기적 스캔 재시작")
-                    stopScanning()
-                    startScanning(activity, onMessageReceived) // 재귀처럼 재시작
+        // ✅ 여기에 1분마다 반복적으로 재시작 루프를 등록합니다.
+        restartHandler.postDelayed(object : Runnable {
+            override fun run() {
+                Log.d("주기적으로", "🔄 주기적 스캔 재시작")
+                stopScanning()
+                startScanning(activity, onMessageReceived) // 재귀처럼 재시작
             }
         }, 1 * 60 * 1000) // 1분마다
     }
@@ -190,5 +197,11 @@ object ScannerManager {
         }
 
         restartHandler.removeCallbacksAndMessages(null)
+    }
+
+    // UUID 유효성 검사 함수
+    private fun isValidUUID(uuid: String): Boolean {
+        // 간단한 UUID 형식 검사 (8자리 16진수)
+        return uuid.length == 8 && uuid.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
     }
 }

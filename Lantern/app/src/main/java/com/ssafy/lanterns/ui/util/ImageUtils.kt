@@ -67,6 +67,9 @@ fun getEffectiveProfileImageRes(user: User): Int {
 // !! 명확한 함수로 대체하는 것을 권장합니다.
 @DrawableRes
 fun getProfileImageResId(id: Int): Int {
+    if (id == -1) {
+        return R.drawable.public_1 // 확성기 아이콘 (모두의 광장)
+    }
     // Ensure imageNumber is within 1-15 range using modulo
     val imageNumber = (id - 1) % 15 + 1
     return when (imageNumber) {
