@@ -16,4 +16,5 @@ interface UserRepository {
     suspend fun clearAllLocalData()
     suspend fun saveDisplayMode(isDarkMode: Boolean)
     suspend fun getDisplayMode(): Boolean
+    suspend fun insertLocalUser(user : User): Long
 }

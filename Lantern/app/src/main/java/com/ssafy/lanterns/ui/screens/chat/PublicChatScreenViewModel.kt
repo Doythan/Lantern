@@ -119,37 +119,63 @@ class PublicChatScreenViewModel @Inject constructor(
         }
     }
 
-    fun addMessage(chatMessageUi: ChatMessage) { // 파라미터 이름을 chatMessageUi로 변경하여 명확화
+    fun addMessage(chatMessageUi: ChatMessage) {
         viewModelScope.launch {
+            // 1. 현재 로그인된 사용자 ID 가져오기
             val currentUserId = _currentUser.value?.userId
-            val senderUserId = if (chatMessageUi.isMe) {
-                currentUserId ?: return@launch // 내가 보낸 메시지인데 사용자 ID가 없으면 전송 불가
-            } else {
-                // 외부에서 수신된 메시지의 경우, sender 닉네임으로 userId를 찾아야 함.
-                // BLE 스캔 시 sender의 고유 ID(userId)를 함께 받아오는 것이 가장 이상적입니다.
-                // 현재는 닉네임 기반으로 조회하며, 없을 경우 UNKNOWN_SENDER_USER_ID 사용
-                userRepository.getUserByNickname(chatMessageUi.sender)?.userId ?: UNKNOWN_SENDER_USER_ID
+            // → 이후 "isMe" 판단 및 메시지 저장 시 사용됩니다 :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
+
+            // 2. BLE 스캔으로 "deviceId|메시지" 조합이 올 경우 파싱
+            var rawSender = chatMessageUi.sender
+            var rawText   = chatMessageUi.text
+            if (!chatMessageUi.isMe && rawText.isBlank() && rawSender.contains("|")) {
+                val parts = rawSender.split("|", limit = 2)
+                rawSender = parts[0]
+                rawText   = parts.getOrNull(1) ?: ""
             }
 
-            val dbMessage = Messages(
-                messageId = System.currentTimeMillis(), // 실제로는 DB에서 자동 생성되도록 하는 것이 좋음
-                userId = senderUserId,
-                chatRoomId = PUBLIC_CHAT_ROOM_ID,
-                text = chatMessageUi.text,
-                date = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(chatMessageUi.time), ZoneOffset.UTC)
-            )
-            val insertedMessageId = messagesDao.insertMessage(dbMessage) // insertMessage가 Long ID를 반환하도록 수정 필요 (현재는 Long)
+            // 3. 보낸 사람의 userId 결정 (내 메시지면 currentUserId, 아니면 닉네임으로 조회)
+            val senderUserId = if (chatMessageUi.isMe) {
+                currentUserId ?: return@launch
+            } else {
+                userRepository.getUserByNickname(rawSender)?.userId
+                    ?: UNKNOWN_SENDER_USER_ID
+            }
+            // UNKNOWN_SENDER_USER_ID는 -2L (알 수 없는 발신자) :contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
 
-            // DB에 삽입된 메시지를 기준으로 ChatMessage 객체 다시 생성 (ID 동기화)
-            val newChatMessage = ChatMessage(
-                id = insertedMessageId, // DB에서 반환된 ID 사용 (MessagesDao 수정 필요)
-                sender = chatMessageUi.sender,
-                text = chatMessageUi.text,
-                time = chatMessageUi.time,
-                isMe = chatMessageUi.isMe,
-                senderProfileId = if (chatMessageUi.isMe) _currentUser.value?.selectedProfileImageNumber
-                else userRepository.getUserById(senderUserId)?.selectedProfileImageNumber ?: 1
+            // 4. DB에 저장할 Messages 엔티티 생성
+            val dbMessage = Messages(
+                messageId  = System.currentTimeMillis(), // 실제론 PK 자동생성 권장
+                userId     = senderUserId,
+                chatRoomId = PUBLIC_CHAT_ROOM_ID,        // 모두의 광장 ID = 0L
+                text       = rawText,
+                date       = LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(chatMessageUi.time),
+                    ZoneOffset.UTC
+                )
             )
+            // Messages 모델 :contentReference[oaicite:4]{index=4}:contentReference[oaicite:5]{index=5}, :contentReference[oaicite:6]{index=6}:contentReference[oaicite:7]{index=7}
+
+            // 5. 삽입 및 새로 생성된 ID 받기
+            val insertedMessageId = messagesDao.insertMessage(dbMessage)
+            // insertMessage()는 Long을 반환하도록 MessagesDao가 설정되어 있어야 합니다 :contentReference[oaicite:8]{index=8}:contentReference[oaicite:9]{index=9}
+
+            // 6. 방금 저장된 메시지로부터 새로운 ChatMessage 생성
+            val newChatMessage = ChatMessage(
+                id              = insertedMessageId,
+                sender          = rawSender,
+                text            = rawText,
+                time            = chatMessageUi.time,
+                isMe            = chatMessageUi.isMe,
+                senderProfileId = if (chatMessageUi.isMe) {
+                    _currentUser.value?.selectedProfileImageNumber
+                } else {
+                    userRepository.getUserById(senderUserId)
+                        ?.selectedProfileImageNumber
+                }
+            )
+
+            // 7. 화면에 표시할 메시지 리스트 갱신
             _messages.value = listOf(newChatMessage) + _messages.value
         }
     }
