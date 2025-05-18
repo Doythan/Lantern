@@ -1,15 +1,15 @@
-package com.ssafy.lanterns.data.repository
+package com.ssafy.lanterns.data.source.local.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+// Follow 모델 임포트 (경로 가정)
 import com.ssafy.lanterns.data.model.Follow
 
 @Dao
 interface FollowDao {
-
     // 친구 추가
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addFollow(follow: Follow): Long
@@ -34,5 +34,4 @@ interface FollowDao {
     // 모든 팔로우 정보 삭제
     @Query("DELETE FROM follow")
     suspend fun deleteAllFollows()
-
-}
+} 

@@ -7,18 +7,18 @@ import com.ssafy.lanterns.ui.theme.ConnectionNear
 
 /**
  * 거리에 따라 적절한 연결 강도 색상을 반환합니다.
- * - 0-99m: 초록색 (ConnectionNear)
- * - 100-299m: 노란색 (ConnectionMedium)
- * - 300m 이상: 빨간색 (ConnectionFar)
+ * - 0-100m: 초록색 (ConnectionNear)
+ * - 101-200m: 노란색 (ConnectionMedium)
+ * - 200m 초과: 빨간색 (ConnectionFar)
  * 
  * @param distance 거리 (미터 단위)
  * @return 거리에 따른 색상
  */
 fun getConnectionColorByDistance(distance: Float): Color {
     return when {
-        distance < 100f -> ConnectionNear
-        distance < 300f -> ConnectionMedium
-        else -> ConnectionFar
+        distance <= 100f -> ConnectionNear    // 100m 이하: 초록색
+        distance <= 200f -> ConnectionMedium  // 200m 이하: 노란색
+        else -> ConnectionFar                 // 200m 초과: 빨간색
     }
 }
 
@@ -38,8 +38,8 @@ private fun lerp(start: Int, end: Int, ratio: Float = 0.5f): Int {
  */
 fun getConnectionStrengthText(distance: Float): String {
     return when {
-        distance < 100f -> "강한 연결"
-        distance < 300f -> "중간 연결"
+        distance <= 100f -> "강한 연결"
+        distance <= 200f -> "중간 연결"
         else -> "약한 연결"
     }
 } 

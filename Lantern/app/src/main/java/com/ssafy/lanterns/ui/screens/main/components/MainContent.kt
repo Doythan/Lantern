@@ -83,6 +83,7 @@ fun MainContent(
     nearbyPeople: List<NearbyPerson>,
     showPersonListModal: Boolean,
     onShowListToggle: () -> Unit,
+    onDismiss: () -> Unit, // 모달 닫기 전용 콜백 추가
     onPersonClick: (userId: String) -> Unit,
     onCallClick: (userId: String) -> Unit,
     rippleStates: Triple<RippleState, RippleState, RippleState>,
@@ -143,9 +144,15 @@ fun MainContent(
             val minRadius = 120.0 // 중앙 버튼과 겹치지 않는 최소 반경
             val maxRadius = 220.0 // 화면 내에 표시되는 최대 반경
             
-            // 거리에 따라 반경 계산 (최소값 보장)
-            val distanceRatio = person.distance / 500.0 // 거리 비율 조정
-            val radius = minRadius + (maxRadius - minRadius) * distanceRatio.coerceIn(0.0, 1.0)
+            // 신호 강도에 따라 거리를 계산
+            // 신호 강도가 높을수록 더 가까이 배치
+            val distanceRatio = when (person.signalLevel) {
+                3 -> 0.1  // 신호가 강함(3) - 가장 가까이 배치
+                2 -> 0.4  // 신호가 중간(2) - 중간 거리에 배치
+                else -> 0.8  // 신호가 약함(1) - 멀리 배치
+            }
+            
+            val radius = minRadius + (maxRadius - minRadius) * distanceRatio
             
             val angleInRadians = Math.toRadians(person.angle.toDouble())
             val x = radius * cos(angleInRadians)
@@ -157,12 +164,20 @@ fun MainContent(
                     .size(50.dp), // 클릭 가능한 영역 확보 (크기 고정)
                 contentAlignment = Alignment.Center
             ) {
+                // LanternDot 함수 호출 시 distance 매개변수를 전달
+                // 신호 레벨에 따라 거리 값을 계산하여 전달
+                val displayDistance = when (person.signalLevel) {
+                    3 -> 10f  // 신호가 강함 - 가까운 거리로 표시
+                    2 -> 50f  // 신호가 중간 - 중간 거리로 표시
+                    else -> 150f  // 신호가 약함 - 먼 거리로 표시
+                }
+                
                 LanternDot(
                     modifier = Modifier,
                     signalStrength = person.signalStrength,
                     pulseScale = animationValues.dotPulseScale,
                     glowAlpha = animationValues.dotGlowAlpha,
-                    distance = person.distance
+                    distance = displayDistance  // 오류가 있던 부분 수정
                 )
             }
         }
@@ -239,7 +254,7 @@ fun MainContent(
         ) {
             NearbyPersonListModal(
                 people = nearbyPeople,
-                onDismiss = onShowListToggle,
+                onDismiss = onDismiss,
                 onPersonClick = onPersonClick,
                 onCallClick = onCallClick
             )
@@ -276,7 +291,7 @@ fun NearbyLanternCount(count: Int) {
             fontWeight = FontWeight.Bold // 굵은 폰트 유지
         )
         Text(
-            text = "명의 랜턴이 있습니다",
+            text = "명의 사람이 있습니다",
             color = TextWhite,
             style = MaterialTheme.typography.titleMedium, // 스타일 변경
             fontSize = 18.sp, // 폰트 크기 증가
@@ -457,95 +472,6 @@ fun RippleCircle(
                 )
             }
     )
-}
-
-/**
- * 랜턴 형태의 점 (기존 PersonDot 대체)
- */
-@Composable
-fun LanternDot(
-    modifier: Modifier = Modifier,
-    signalStrength: Float = 1f,
-    pulseScale: Float = 1f,
-    glowAlpha: Float = 0.5f,
-    distance: Float = 0f
-) {
-    val connectionColor = getConnectionColorByDistance(distance)
-    val lanternYellow = Color(0xFFFFC107) // 랜턴 노란색
-    
-    Box(modifier = modifier) {
-        // 첫 번째 Box (기본 랜턴)
-        Box(
-            modifier = Modifier
-                .size(14.dp) // 기본 크기 유지
-                .scale(pulseScale)
-                .shadow(
-                    elevation = 8.dp,
-                    spotColor = lanternYellow,
-                    shape = CircleShape
-                )
-                .clip(CircleShape)
-                .background(lanternYellow) // 노란색 랜턴 색상으로 변경
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = { /* 점을 클릭했을 때 이벤트 처리 - 나중에 구현 */ }
-                )
-        ) {
-            // 내부 빛 효과
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(glowAlpha)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White,
-                                lanternYellow.copy(alpha = 0.7f)
-                            )
-                        )
-                    )
-            )
-            
-            // 빛 테두리 효과
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        // 빛이 퍼지는 효과를 위한 외부 원
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    lanternYellow.copy(alpha = 0.6f),
-                                    lanternYellow.copy(alpha = 0.0f)
-                                ),
-                                radius = size.width * 1.2f
-                            ),
-                            radius = size.width * 1.2f
-                        )
-                    }
-            )
-        }
-        
-        // 두 번째 Box (확장된 빛 효과) - @Composable 컨텍스트 내에서 호출
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .scale(pulseScale)
-                .alpha(glowAlpha * 0.6f)
-                .drawBehind {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                lanternYellow.copy(alpha = 0.3f),
-                                lanternYellow.copy(alpha = 0.0f)
-                            )
-                        ),
-                        radius = size.width
-                    )
-                }
-        )
-    }
 }
 
 /**
