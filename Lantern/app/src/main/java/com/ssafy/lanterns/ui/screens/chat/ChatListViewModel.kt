@@ -3,11 +3,11 @@ package com.ssafy.lanterns.ui.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.lanterns.data.model.ChatRoom
-import com.ssafy.lanterns.data.model.Message
+import com.ssafy.lanterns.data.model.Messages
 import com.ssafy.lanterns.data.model.User
-import com.ssafy.lanterns.data.source.local.dao.ChatRoomDao
-import com.ssafy.lanterns.data.source.local.dao.MessageDao
-import com.ssafy.lanterns.data.source.local.dao.UserDao
+import com.ssafy.lanterns.data.repository.ChatRoomDao
+import com.ssafy.lanterns.data.repository.MessagesDao
+import com.ssafy.lanterns.data.repository.UserDao
 import com.ssafy.lanterns.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +39,7 @@ class ChatListViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val userDao: UserDao,
     private val chatRoomDao: ChatRoomDao,
-    private val messageDao: MessageDao
+    private val messagesDao: MessagesDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatListUiState(isLoading = true))
@@ -106,8 +106,8 @@ class ChatListViewModel @Inject constructor(
                     val participant = userDao.getUserById(participantId)
                     
                     // 해당 채팅방의 최신 메시지 가져오기
-                    // Flow<List<Message>>를 바로 사용할 수 없어 최신 메시지는 다른 방식으로 구현
-                    val lastMessage = messageDao.getLatestMessageForChatRoom(chatRoom.chatRoomId.toString())
+                    val messages = messagesDao.getMessages(chatRoom.chatRoomId, 1, 0)
+                    val lastMessage = messages.firstOrNull()
                     
                     // 임의의 거리 설정 (실제로는 BLE를 통해 거리 계산)
                     val distance = Random.nextFloat() * 300
@@ -118,10 +118,8 @@ class ChatListViewModel @Inject constructor(
                             ChatItem(
                                 id = participantId.toInt(),  // 상대방 ID로 설정
                                 name = participant.nickname,
-                                lastMessage = lastMessage?.content ?: "대화를 시작해보세요",
-                                time = formatDateTime(lastMessage?.timestamp?.let { timestamp -> 
-                                    LocalDateTime.ofEpochSecond(timestamp / 1000, 0, java.time.ZoneOffset.UTC) 
-                                } ?: LocalDateTime.now()),
+                                lastMessage = lastMessage?.text ?: "대화를 시작해보세요",
+                                time = formatDateTime(lastMessage?.date ?: LocalDateTime.now()),
                                 unread = false, // 읽음 상태 관리 기능 추가 필요
                                 distance = distance
                             )
@@ -148,26 +146,23 @@ class ChatListViewModel @Inject constructor(
     }
     
     /**
-     * 주변 사용자 스캔 (실제 BLE 스캔 로직이 들어갈 위치)
+     * 주변 사용자 생성 (BLE 스캔 결과를 모방한 더미 데이터)
      */
     private fun generateNearbyUsers() {
         viewModelScope.launch {
-            try {
-                // 실제 구현에서는 BLE 스캔 로직과 검색된 사용자 데이터 처리 로직이 들어갈 위치
-                // 더미 데이터 대신 실제 BLE 스캔 결과 사용
-                
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        isLoading = false
-                    )
-                }
-            } catch (e: Exception) {
-                _uiState.update { currentState ->
-                    currentState.copy(
-                        isLoading = false,
-                        errorMessage = "주변 사용자 정보 로드 오류: ${e.message}"
-                    )
-                }
+            val nearbyUsers = listOf(
+                NearbyUser(id = 1, name = "도경원", distance = 30f),
+                NearbyUser(id = 2, name = "도경원2", distance = 85f),
+                NearbyUser(id = 3, name = "여자친구", distance = 150f),
+                NearbyUser(id = 4, name = "친구1", distance = 220f),
+                NearbyUser(id = 5, name = "친구2", distance = 310f),
+                NearbyUser(id = 6, name = "친구3", distance = 50f),
+                NearbyUser(id = 7, name = "친구4", distance = 180f),
+                NearbyUser(id = 8, name = "친구5", distance = 270f)
+            )
+            
+            _uiState.update {
+                it.copy(nearbyUsers = nearbyUsers)
             }
         }
     }
@@ -217,19 +212,14 @@ class ChatListViewModel @Inject constructor(
                 val alreadyExists = existingRooms.any { it.participantId == participantId }
                 
                 if (!alreadyExists) {
-                    // 상대방 정보 가져오기
-                    val participant = userDao.getUserById(participantId)
-                    
                     // 새 채팅방 생성
-                    val chatRoom = ChatRoom(
-                        chatRoomId = System.currentTimeMillis().toString(),
-                        participantId = participantId,
-                        participantNickname = participant?.nickname ?: "사용자",
-                        participantProfileImageNumber = participant?.selectedProfileImageNumber ?: 1,
-                        updatedAt = LocalDateTime.now()
+                    val chatRoomId = chatRoomDao.InsertChatRoom(
+                        ChatRoom(
+                            chatRoomId = System.currentTimeMillis(),
+                            updatedAt = LocalDateTime.now(),
+                            participantId = participantId
+                        )
                     )
-                    
-                    chatRoomDao.insertChatRoom(chatRoom)
                     
                     // 채팅방 목록 다시 로드
                     loadChatRooms()

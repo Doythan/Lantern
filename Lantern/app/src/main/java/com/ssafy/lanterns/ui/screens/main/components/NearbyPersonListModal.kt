@@ -5,7 +5,9 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -40,12 +43,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.ssafy.lanterns.ui.theme.BleAccent
+import com.ssafy.lanterns.ui.theme.BleBlue1
+import com.ssafy.lanterns.ui.theme.BleBlue2
+import com.ssafy.lanterns.ui.theme.ConnectionFar
+import com.ssafy.lanterns.ui.theme.ConnectionMedium
+import com.ssafy.lanterns.ui.theme.ConnectionNear
+import com.ssafy.lanterns.ui.theme.LanternYellow
 import com.ssafy.lanterns.utils.getConnectionColorByDistance
+import com.ssafy.lanterns.utils.getConnectionStrengthText
 
 // 이징 애니메이션 커브 (모달 애니메이션용)
 private val EaseOutQuart = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
@@ -79,7 +96,7 @@ fun NearbyPersonListModal(
                     .fillMaxSize()
                     .alpha(0.5f)
                     .background(MaterialTheme.colorScheme.scrim)
-                    .clickable(onClick = onDismiss)
+                    .clickable { onDismiss() }
             )
             
             // 모달 콘텐츠 - 아래에서 위로 슬라이드 애니메이션
@@ -97,8 +114,7 @@ fun NearbyPersonListModal(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 500.dp)
-                        .clickable(enabled = false) {},
+                        .heightIn(max = 500.dp),
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
@@ -140,11 +156,11 @@ fun NearbyPersonListModal(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(people.sortedByDescending { it.signalLevel }) { person ->
+                            items(people.sortedBy { it.distance }) { person ->
                                 PersonListItemWithButtons(
                                     person = person,
-                                    onChatClick = { onPersonClick(person.bleId) },
-                                    onCallClick = { onCallClick(person.bleId) }
+                                    onChatClick = { onPersonClick(person.userId) },
+                                    onCallClick = { onCallClick(person.userId) }
                                 )
                             }
                         }
@@ -157,7 +173,6 @@ fun NearbyPersonListModal(
 
 /**
  * 주변 사람 목록 아이템 (채팅 및 통화 버튼 포함)
- * - 간소화된 UI: 프로필 이미지, 닉네임, 신호 강도, 채팅/통화 버튼 표시
  */
 @Composable
 fun PersonListItemWithButtons(
@@ -165,22 +180,10 @@ fun PersonListItemWithButtons(
     onChatClick: () -> Unit,
     onCallClick: () -> Unit
 ) {
-    // 신호 강도 레벨에 따른 색상 및 활성화 상태 결정
-    val signalColor = when (person.signalLevel) {
-        3 -> Color.Green     // 강한 신호
-        2 -> Color.Yellow    // 중간 신호
-        else -> Color.Red    // 약한 신호
-    }
+    val connectionColor = getConnectionColorByDistance(person.distance)
     
-    // 통화 버튼은 신호 강도 2 이상인 사용자에게만 활성화
-    val isCallEnabled = person.signalLevel >= 2
-    
-    // 신호 강도 텍스트
-    val signalText = when (person.signalLevel) {
-        3 -> "강한 신호"
-        2 -> "중간 신호"
-        else -> "약한 신호"
-    }
+    // 통화 버튼은 100m 이내의 사용자에게만 활성화
+    val isCallEnabled = person.distance <= 100f
     
     Card(
         modifier = Modifier
@@ -197,102 +200,109 @@ fun PersonListItemWithButtons(
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // 프로필 이미지
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
+            // 왼쪽: 프로필 이미지와 사용자 정보
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "프로필 이미지",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            // 사용자 정보 영역
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                // 이름
-                Text(
-                    text = person.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                // 신호 강도 정보 (RSSI 기반)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 아바타 이미지
+                Box(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(CircleShape)
+                        .background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    BleBlue1,
+                                    BleBlue2
+                                )
+                            )
+                        )
+                        .border(width = 2.dp, color = connectionColor.copy(alpha = 0.5f), shape = CircleShape),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // 신호 강도 표시기
-                    SignalStrengthIndicator(
-                        level = person.signalLevel
+                    Image(
+                        painter = rememberVectorPainter(Icons.Default.Person),
+                        contentDescription = "프로필 이미지",
+                        modifier = Modifier
+                            .size(30.dp)
+                            .alpha(0.9f),
                     )
-                    
-                    // 신호 강도 텍스트
+                }
+                
+                // 사용자 정보
+                Column {
                     Text(
-                        text = signalText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = signalColor
+                        text = person.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    // 거리 정보
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = connectionColor.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "${person.distance.toInt()} m",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = connectionColor
+                        )
+                    }
                 }
             }
             
-            // 버튼 영역
+            // 오른쪽: 채팅 및 통화 버튼
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // 채팅 버튼
                 IconButton(
                     onClick = onChatClick,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
                         .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                            shape = CircleShape
+                            color = LanternYellow
                         )
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Chat,
+                        imageVector = Icons.Default.Chat,
                         contentDescription = "채팅하기",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 
-                // 통화 버튼 (신호 강도에 따라 활성화)
+                // 통화 버튼 (100m 이내일 때만 활성화)
                 IconButton(
                     onClick = onCallClick,
                     enabled = isCallEnabled,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
                         .background(
-                            color = if (isCallEnabled) {
-                                Color(0xFF21AA73).copy(alpha = 0.1f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-                            },
-                            shape = CircleShape
+                            if (isCallEnabled) BleAccent 
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
                         )
                 ) {
                     Icon(
-                        imageVector = Icons.Filled.Call,
-                        contentDescription = "전화하기",
-                        tint = if (isCallEnabled) {
-                            Color(0xFF21AA73)
-                        } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        },
-                        modifier = Modifier.size(20.dp)
+                        imageVector = Icons.Default.Call,
+                        contentDescription = "전화걸기",
+                        tint = if (isCallEnabled) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

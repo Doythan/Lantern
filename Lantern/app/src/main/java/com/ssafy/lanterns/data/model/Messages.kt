@@ -5,15 +5,21 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
 
-@Entity(tableName = "chat_room")
-data class ChatRoom(
+@Entity(tableName = "messages")
+data class Messages(
     @PrimaryKey
+    @ColumnInfo(name = "message_id")
+    val messageId: Long,
+
+    @ColumnInfo(name = "user_id")
+    val userId: Long,
+
     @ColumnInfo(name = "chat_room_id")
     val chatRoomId: Long,
 
-    @ColumnInfo(name = "updated_at")
-    val updatedAt: LocalDateTime,
+    val text: String,
 
-    @ColumnInfo(name = "participant_id")
-    val participantId: Long
+    val date: LocalDateTime,
+
+
 )

@@ -56,16 +56,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import android.content.Context
 import com.ssafy.lanterns.ui.navigation.AppDestinations
-import android.app.Activity
-import android.util.Log
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.ActivityResultLauncher
-import com.ssafy.lanterns.utils.PermissionHelper
-import com.ssafy.lanterns.service.ble.GlobalBleManager
-import androidx.lifecycle.DefaultLifecycleObserver
-import androidx.lifecycle.LifecycleOwner
-import androidx.activity.ComponentActivity
 
 /**
  * 메인 화면
@@ -83,9 +73,8 @@ fun MainScreen(
     paddingValues: PaddingValues = PaddingValues(0.dp),
     viewModel: MainViewModel = hiltViewModel()
 ) {
-    // ViewModel에서 상태 가져오기
+    // ViewModel로부터 UI 상태 수집
     val uiState by viewModel.uiState.collectAsState()
-    val aiActive by viewModel.aiActive.collectAsState()
     
     // 코루틴 스코프
     val coroutineScope = rememberCoroutineScope()
@@ -98,116 +87,15 @@ fun MainScreen(
     
     // 생명주기 관찰자 - 업데이트된 패키지 사용
     val lifecycleOwner = LocalLifecycleOwner.current
-    // 액티비티 컨텍스트 가져오기
+    // TODO: context 변수는 BLE 로직 구현 시 사용될 예정입니다.
+    @Suppress("UNUSED_VARIABLE")
     val context = LocalContext.current
-    
-    // Activity 설정 및 BLE 초기화
-    LaunchedEffect(Unit) {
-        val activity = context as? Activity
-        if (activity != null) {
-            // ViewModel에 Activity 설정 (중요 - BLE 초기화 트리거)
-            try {
-                Log.d("MainScreen", "Activity 설정 시작: $activity")
-                viewModel.setActivity(activity)
-                Log.d("MainScreen", "Activity 설정 성공: $activity")
-                
-                // 권한 체크 및 요청
-                val permissionHelper = PermissionHelper(activity)
-                
-                // 권한이 없으면 요청
-                if (!permissionHelper.hasPermission()) {
-                    Log.d("MainScreen", "BLE 권한 요청 시작")
-                    permissionHelper.requestPermissions(1001)
-                    Log.d("MainScreen", "BLE 권한 요청 완료")
-                } else {
-                    // 권한이 있으면 블루투스 상태 확인
-                    val bluetoothEnabled = permissionHelper.isBluetoothEnabeld()
-                    Log.d("MainScreen", "BLE 권한 확인됨, 블루투스 상태: $bluetoothEnabled")
-                    
-                    // BLE 권한 상태 업데이트
-                    viewModel.updateBlePermissionStatus(true)
-                    viewModel.updateBluetoothState(bluetoothEnabled)
-                    
-                    if (!bluetoothEnabled) {
-                        // 블루투스 활성화 요청
-                        Log.d("MainScreen", "블루투스 활성화 요청 시작")
-                        permissionHelper.requestEnableBluetooth(1002)
-                        Log.d("MainScreen", "블루투스 활성화 요청 완료")
-                    } else {
-                        Log.d("MainScreen", "블루투스 이미 활성화됨")
-                        
-                        // 블루투스가 활성화되었으므로 즉시 스캔/광고 시작
-                        Log.d("MainScreen", "BLE 작업 즉시 시작 요청")
-                        viewModel.restoreScanningStateIfNeeded()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MainScreen", "Activity 설정 중 오류 발생: ${e.message}, ${e.stackTraceToString()}")
-            }
-        } else {
-            Log.e("MainScreen", "Activity 설정 실패: 컨텍스트가 Activity가 아님")
-        }
-    }
-    
-    // 권한 요청 결과 처리
-    LaunchedEffect(uiState.blePermissionsGranted, uiState.isBluetoothEnabled) {
-        // 권한 상태가 변경되면 스캔 상태 복원
-        Log.d("MainScreen", "BLE 상태 변경 감지 - 권한: ${uiState.blePermissionsGranted}, 블루투스: ${uiState.isBluetoothEnabled}")
-        
-        // 권한과 블루투스가 모두 활성화된 경우에만 스캔 복원
-        if (uiState.blePermissionsGranted && uiState.isBluetoothEnabled) {
-            Log.d("MainScreen", "BLE 작업 조건 충족 - 스캔 상태 복원 요청")
-            viewModel.restoreScanningStateIfNeeded()
-            
-            // 상태 로그
-            if (uiState.nearbyPeople.isEmpty()) {
-                Log.d("MainScreen", "주변 사용자가 아직 탐지되지 않음")
-            } else {
-                Log.d("MainScreen", "현재 ${uiState.nearbyPeople.size}명의 주변 사용자가 탐지됨")
-            }
-        } else {
-            Log.d("MainScreen", "BLE 작업 조건 미충족 - 권한 또는 블루투스 비활성화 상태")
-        }
-    }
-    
-    // 권한 관련 ActivityResult 처리
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { permissionsResult ->
-            val allGranted = permissionsResult.entries.all { entry -> entry.value }
-            viewModel.updateBlePermissionStatus(allGranted)
-            
-            if (allGranted) {
-                Log.d("MainScreen", "모든 BLE 권한 획득 완료")
-            } else {
-                val deniedPermissions = permissionsResult.filter { !it.value }.keys.joinToString()
-                Log.e("MainScreen", "일부 BLE 권한 거부됨: $deniedPermissions")
-            }
-        }
-    )
-    
-    // 블루투스 활성화 요청 결과 처리
-    val bluetoothLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-        onResult = { result ->
-            val resultCode = result.resultCode
-            val isEnabled = resultCode == Activity.RESULT_OK
-            viewModel.updateBluetoothState(isEnabled)
-            
-            if (isEnabled) {
-                Log.d("MainScreen", "블루투스 활성화됨 - BLE 작업 시작 요청")
-                viewModel.restoreScanningStateIfNeeded() // 블루투스 활성화 즉시 스캔 시작
-            } else {
-                Log.e("MainScreen", "블루투스 활성화 거부됨 - BLE 작업 시작 불가")
-            }
-        }
-    )
     
     // navigateToProfile 상태가 변경되면 프로필 화면으로 이동
     LaunchedEffect(uiState.navigateToProfile) {
         uiState.navigateToProfile?.let { userId ->
             // 프로필 화면으로 이동 (프로필 화면에서 채팅하기 버튼으로 채팅 화면 이동)
-            val person = uiState.nearbyPeople.find { it.userId.toString() == userId }
+            val person = uiState.nearbyPeople.find { it.userId == userId }
             if (person != null) {
                 val route = "profile/${userId}/${person.name}/${person.distance.toInt()}m"
                 navController.navigate(route)
@@ -217,33 +105,37 @@ fun MainScreen(
     }
     
     // 생명주기에 따른 스캔 상태 관리
-    DisposableEffect(Unit) {
-        // BLE 관리자에 메인 화면 등록
-        GlobalBleManager.setActiveScreen(
-            screenType = GlobalBleManager.SCREEN_MAIN,
-            activity = context as Activity
-        )
-        
-        // 백그라운드로 앱이 이동할 때 BLE 리소스 관리를 위해 앱 생명주기 관찰
-        val lifecycleObserver = object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) {
-                // 앱이 포그라운드로 돌아왔을 때
-                GlobalBleManager.resume()
-            }
-            
-            override fun onStop(owner: LifecycleOwner) {
-                // 앱이 백그라운드로 이동했을 때
-                GlobalBleManager.pause()
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                // 화면으로 돌아왔을 때 스캔 상태 복원
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.restoreScanningStateIfNeeded()
+                    if (uiState.isScanning) {
+                        // 스캔 복원 로직
+                        rippleVisible.value = true
+                        // 스캔 애니메이션 재시작
+                        coroutineScope.launch {
+                            runRippleAnimation(rippleAnimatable1, rippleAnimatable2, rippleAnimatable3)
+                        }
+                    }
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    // 화면이 백그라운드로 갈 때 애니메이션만 일시 중단
+                    // 실제 스캔 상태는 ViewModel에 유지됨
+                    rippleVisible.value = false
+                }
+                Lifecycle.Event.ON_STOP -> {
+                    // 여기서는 애니메이션 관련된 리소스만 정리
+                    // 스캔 자체는 ViewModel에서 유지됨
+                    rippleVisible.value = false
+                }
+                else -> { /* 다른 이벤트는 처리하지 않음 */ }
             }
         }
-        
-        // 액티비티 생명주기에 옵저버 추가
-        val lifecycle = (context as? ComponentActivity)?.lifecycle
-        lifecycle?.addObserver(lifecycleObserver)
-        
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            // 생명주기 옵저버 제거
-            lifecycle?.removeObserver(lifecycleObserver)
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
     
@@ -333,6 +225,7 @@ fun MainScreen(
                 .then(modifier),
             contentAlignment = Alignment.Center
         ) {
+
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
                 isScanning = uiState.isScanning,
@@ -343,16 +236,15 @@ fun MainScreen(
                 nearbyPeople = uiState.nearbyPeople,
                 showPersonListModal = uiState.showPersonListModal,
                 onShowListToggle = { viewModel.togglePersonListModal() },
-                onDismiss = { viewModel.closePersonListModal() },
                 onPersonClick = { userId ->
                     // 채팅 화면으로 이동
                     navController.navigate("${AppDestinations.DIRECT_CHAT_ROUTE.replace("{userId}", userId)}")
-                    viewModel.closePersonListModal()
+                    viewModel.togglePersonListModal() // 모달 닫기
                 },
                 onCallClick = { userId ->
                     // 통화 화면으로 이동
                     navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", userId)}")
-                    viewModel.closePersonListModal()
+                    viewModel.togglePersonListModal() // 모달 닫기
                 },
                 rippleStates = Triple(
                     RippleState(rippleVisible.value, rippleAnimatable1.value),
