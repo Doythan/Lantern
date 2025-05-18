@@ -24,9 +24,10 @@ import com.ssafy.lanterns.data.repository.UserDao
         Follow::class,
         ChatRoom::class
     ],
-    version = 2,
+    version = 3,
     autoMigrations = [
-        AutoMigration(from = 1, to = 2)
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3)
     ],// 버전 2로 업데이트
     exportSchema = true,             // 스키마 JSON 내보내기
 

@@ -1,5 +1,6 @@
 package com.ssafy.lanterns.ui.screens.chat
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import com.ssafy.lanterns.data.model.User
 import com.ssafy.lanterns.data.repository.UserRepository
@@ -121,62 +122,103 @@ class PublicChatScreenViewModel @Inject constructor(
 
     fun addMessage(chatMessageUi: ChatMessage) {
         viewModelScope.launch {
-            // 1. 현재 로그인된 사용자 ID 가져오기
             val currentUserId = _currentUser.value?.userId
-            // → 이후 "isMe" 판단 및 메시지 저장 시 사용됩니다 :contentReference[oaicite:0]{index=0}:contentReference[oaicite:1]{index=1}
+            var rawSenderFromBle = chatMessageUi.sender // Scanner에서 온 값 (형식: "닉네임" 또는 "닉네임|메시지부분2")
+            var rawTextFromBle = chatMessageUi.text   // Scanner에서 온 값 (형식: "메시지부분1")
 
-            // 2. BLE 스캔으로 "deviceId|메시지" 조합이 올 경우 파싱
-            var rawSender = chatMessageUi.sender
-            var rawText   = chatMessageUi.text
-            if (!chatMessageUi.isMe && rawText.isBlank() && rawSender.contains("|")) {
-                val parts = rawSender.split("|", limit = 2)
-                rawSender = parts[0]
-                rawText   = parts.getOrNull(1) ?: ""
-            }
+            var finalSenderNickname = "익명" // 최종적으로 사용할 닉네임
+            var finalMessageText = ""    // 최종적으로 사용할 메시지 본문
 
-            // 3. 보낸 사람의 userId 결정 (내 메시지면 currentUserId, 아니면 닉네임으로 조회)
-            val senderUserId = if (chatMessageUi.isMe) {
-                currentUserId ?: return@launch
+            // --- ViewModel 레벨에서 닉네임 및 메시지 재구성 시도 ---
+            if (chatMessageUi.isMe) {
+                finalSenderNickname = _currentUser.value?.nickname ?: "나"
+                finalMessageText = rawTextFromBle // 내 메시지는 Scanner를 거치지 않으므로 text가 전체 메시지
             } else {
-                userRepository.getUserByNickname(rawSender)?.userId
-                    ?: UNKNOWN_SENDER_USER_ID
-            }
-            // UNKNOWN_SENDER_USER_ID는 -2L (알 수 없는 발신자) :contentReference[oaicite:2]{index=2}:contentReference[oaicite:3]{index=3}
+                // rawSenderFromBle 의 형식 가정: "닉네임" 또는 "닉네임|메시지부분2"
+                // rawTextFromBle 의 형식 가정: "메시지부분1" (uuid는 Scanner에서 이미 처리됨)
 
-            // 4. DB에 저장할 Messages 엔티티 생성
+                val senderParts = rawSenderFromBle.split("|", limit = 2)
+                val potentialNickname = senderParts.getOrNull(0)?.takeIf { it.isNotBlank() }
+
+                if (potentialNickname != null) {
+                    finalSenderNickname = potentialNickname
+                    // 메시지 조합: Scanner에서 온 text (메시지부분1) + senderParts에서 나온 메시지부분2 (있을 경우)
+                    finalMessageText = rawTextFromBle + (senderParts.getOrNull(1) ?: "")
+                } else {
+                    // rawSenderFromBle에서 닉네임을 추출할 수 없는 경우
+                    // 이 경우는 ScannerManager에서 이미 "익명"으로 처리되었을 가능성이 높음
+                    finalSenderNickname = rawSenderFromBle.takeIf { it.isNotBlank() } ?: "익명"
+                    finalMessageText = rawTextFromBle
+                }
+
+                // 만약 rawTextFromBle 에도 '|' 구분자가 있고, 닉네임 정보가 포함된 다른 형식일 가능성도 고려?
+                // (현재 BLE 프로토콜 상으로는 그럴 가능성 낮음)
+                // 예: if (rawTextFromBle.contains("|") && finalSenderNickname == "익명") { ... }
+            }
+            Log.d("PublicChatVM_AddMsg", "ViewModel 파싱 후: Nickname='${finalSenderNickname}', Message='${finalMessageText}' (원본 sender='${rawSenderFromBle}', text='${rawTextFromBle}')")
+            // --- ViewModel 레벨 파싱 끝 ---
+
+
+            val senderUserId = if (chatMessageUi.isMe) {
+                currentUserId ?: run {
+                    Log.e("PublicChatVM", "현재 사용자 ID를 알 수 없어 메시지를 저장할 수 없습니다.")
+                    return@launch
+                }
+            } else {
+                userRepository.getUserByNickname(finalSenderNickname)?.userId ?: UNKNOWN_SENDER_USER_ID
+            }
+
             val dbMessage = Messages(
-                messageId  = System.currentTimeMillis(), // 실제론 PK 자동생성 권장
-                userId     = senderUserId,
-                chatRoomId = PUBLIC_CHAT_ROOM_ID,        // 모두의 광장 ID = 0L
-                text       = rawText,
-                date       = LocalDateTime.ofInstant(
+                messageId = 0L, // Room에서 자동 생성되도록 (엔티티에서 @PrimaryKey(autoGenerate = true) 필요)
+                userId = senderUserId,
+                chatRoomId = PUBLIC_CHAT_ROOM_ID,
+                text = finalMessageText, // ViewModel에서 재구성한 메시지 사용
+                date = LocalDateTime.ofInstant(
                     java.time.Instant.ofEpochMilli(chatMessageUi.time),
                     ZoneOffset.UTC
                 )
             )
-            // Messages 모델 :contentReference[oaicite:4]{index=4}:contentReference[oaicite:5]{index=5}, :contentReference[oaicite:6]{index=6}:contentReference[oaicite:7]{index=7}
 
-            // 5. 삽입 및 새로 생성된 ID 받기
             val insertedMessageId = messagesDao.insertMessage(dbMessage)
-            // insertMessage()는 Long을 반환하도록 MessagesDao가 설정되어 있어야 합니다 :contentReference[oaicite:8]{index=8}:contentReference[oaicite:9]{index=9}
+            val savedDbMessage = messagesDao.getMessageById(insertedMessageId) // DAO에 getMessageById 추가 필요 (이전 답변 참고)
 
-            // 6. 방금 저장된 메시지로부터 새로운 ChatMessage 생성
+            if (savedDbMessage == null) {
+                Log.e("PublicChatVM", "메시지 저장 후 DB에서 찾을 수 없음: ID=$insertedMessageId. 임시 UI 업데이트 사용.")
+                // DB 저장 실패 시, BLE로 받은 값 기반으로 임시 UI 업데이트 (닉네임 정확도 낮을 수 있음)
+                val tempChatMessage = chatMessageUi.copy(
+                    id = insertedMessageId, // 임시 ID라도 할당
+                    sender = finalSenderNickname,
+                    text = finalMessageText,
+                    isMe = (senderUserId == currentUserId),
+                    senderProfileId = if (senderUserId == currentUserId) _currentUser.value?.selectedProfileImageNumber
+                    else userRepository.getUserById(senderUserId)?.selectedProfileImageNumber ?: 1
+                )
+                _messages.value = listOf(tempChatMessage) + _messages.value.filterNot { it.id == 0L && it.time == tempChatMessage.time }
+                return@launch
+            }
+
+            // DB에서 성공적으로 가져온 메시지 기반으로 ChatMessage UI 객체 생성
             val newChatMessage = ChatMessage(
-                id              = insertedMessageId,
-                sender          = rawSender,
-                text            = rawText,
-                time            = chatMessageUi.time,
-                isMe            = chatMessageUi.isMe,
-                senderProfileId = if (chatMessageUi.isMe) {
+                id = savedDbMessage.messageId,
+                sender = if (savedDbMessage.userId == currentUserId) {
+                    _currentUser.value?.nickname ?: "나"
+                } else {
+                    // DB에 저장된 userId로 닉네임 다시 조회 (정확도 향상)
+                    // 또는 finalSenderNickname 사용 (BLE 수신 값을 더 신뢰할 경우)
+                    userRepository.getUserById(savedDbMessage.userId)?.nickname
+                        ?: finalSenderNickname.takeIf { it.isNotBlank() } // DB에 없으면 BLE 값
+                        ?: "익명" // 둘 다 없으면 익명
+                },
+                text = savedDbMessage.text,
+                time = savedDbMessage.date.toInstant(ZoneOffset.UTC).toEpochMilli(),
+                isMe = (savedDbMessage.userId == currentUserId),
+                senderProfileId = if (savedDbMessage.userId == currentUserId) {
                     _currentUser.value?.selectedProfileImageNumber
                 } else {
-                    userRepository.getUserById(senderUserId)
-                        ?.selectedProfileImageNumber
+                    userRepository.getUserById(savedDbMessage.userId)?.selectedProfileImageNumber ?: 1
                 }
             )
-
-            // 7. 화면에 표시할 메시지 리스트 갱신
-            _messages.value = listOf(newChatMessage) + _messages.value
+            _messages.value = listOf(newChatMessage) + _messages.value.filterNot { it.id == 0L && it.time == newChatMessage.time }
         }
     }
 
