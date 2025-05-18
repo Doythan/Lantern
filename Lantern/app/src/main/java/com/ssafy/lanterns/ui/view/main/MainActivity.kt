@@ -37,17 +37,10 @@ import dagger.hilt.android.AndroidEntryPoint
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    /* -------------------------------------------------- *
-     * ViewModels
-     * -------------------------------------------------- */
     private val mainViewModel: MainViewModel by viewModels()
 
     private lateinit var requestOverlayPermissionLauncher: ActivityResultLauncher<Intent>
 
-
-    /* -------------------------------------------------- *
-     * 웨이크워드 브로드캐스트 수신
-     * -------------------------------------------------- */
     private val wakeWordReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == WakeWordService.ACTION_ACTIVATE_AI) {
@@ -81,21 +74,31 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            permissions[Manifest.permission.CALL_PHONE]?.let { isGranted ->
+                if (isGranted) {
+                    Log.d("MainActivity", "CALL_PHONE 권한이 허용되었습니다.")
+                } else {
+                    Log.w("MainActivity", "CALL_PHONE 권한이 거부되었습니다.")
+                    Toast.makeText(this, "전화 권한이 거부되어 일부 기능을 사용할 수 없습니다.", Toast.LENGTH_LONG).show()
+                }
+            }
+
             if (allRequiredPermissionsGranted) {
                 checkAndRequestOverlayPermission()
+            } else {
+                Log.w("MainActivity", "필수 권한 중 일부가 거부되었습니다.")
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ── Porcupine 모델 파일 미발견 시 WakeWord 기능 완전 비활성화 ──
         if (!WakeWordUtils.hasModelFiles(this)) {
             Log.w("MainActivity", "모델 파일(.pv/.ppn) 미발견 → WakeWord 기능 비활성화")
             setContent {
-                LanternsTheme  {
+                LanternsTheme {
                     Surface(modifier = Modifier.fillMaxSize()) {
-                        App()  // UI만 띄우고 서비스·권한 요청 없이 종료
+                        App()
                     }
                 }
             }
@@ -116,9 +119,8 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-        /* --- Compose UI --- */
         setContent {
-            LanternsTheme  {
+            LanternsTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     App()
                 }
@@ -138,31 +140,35 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "wakeWordReceiver 해제")
     }
 
-
-
     /* ==================================================
      *  권한 / Overlay 처리
      * ================================================== */
     private fun checkAndRequestPermissions() {
-        val permissions = mutableListOf<String>()
+        val permissionsToRequest = mutableListOf<String>()
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
-            permissions.add(Manifest.permission.RECORD_AUDIO)
+            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
 
-        if (permissions.isNotEmpty()) {
-            Log.d("MainActivity", "요청할 권한: $permissions")
-            requestMultiplePermissionsLauncher.launch(permissions.toTypedArray())
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionsToRequest.add(Manifest.permission.CALL_PHONE)
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            Log.d("MainActivity", "요청할 권한: $permissionsToRequest")
+            requestMultiplePermissionsLauncher.launch(permissionsToRequest.toTypedArray())
         } else {
             Log.d("MainActivity", "일반 권한 이미 모두 허용됨")
             checkAndRequestOverlayPermission()
@@ -172,14 +178,18 @@ class MainActivity : ComponentActivity() {
     private fun checkAndRequestOverlayPermission() {
         if (!Settings.canDrawOverlays(this)) {
             Log.d("MainActivity", "다른 앱 위에 그리기 권한 없음 → 설정 화면 이동")
-            Toast.makeText(this, "AI 화면을 표시하려면 '다른 앱 위에 표시' 권한이 필요합니다.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "AI 화면을 표시하려면 '다른 앱 위에 표시' 권한이 필요합니다.",
+                Toast.LENGTH_LONG
+            ).show()
             val intent = Intent(
                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                 Uri.parse("package:$packageName")
             )
             requestOverlayPermissionLauncher.launch(intent)
         } else {
-            Log.d("MainActivity", "다른 앱 위에 그리기 권한 이미 허용됨")
+            Log.d("MainActivity", "다른 앱 위에 그리기 권한이 이미 허용되어 있습니다.")
             startWakeWordService()
         }
     }
@@ -203,6 +213,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-
 }

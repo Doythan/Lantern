@@ -225,6 +225,7 @@ fun MainScreen(
                 .then(modifier),
             contentAlignment = Alignment.Center
         ) {
+
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
                 isScanning = uiState.isScanning,
