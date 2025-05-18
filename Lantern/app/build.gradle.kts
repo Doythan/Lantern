@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -12,15 +10,7 @@ ksp {
     arg("room.incremental", "true")
 }
 
-val localProps = Properties().apply {
-    val f = rootProject.file("local.properties")
-    if (f.exists()) f.inputStream().use(::load)
-}
-val pvKeyDev1: String = localProps.getProperty("pvKeyDev1", "")
-val pvKeyDev2: String = localProps.getProperty("pvKeyDev2", "")
-
 android {
-    flavorDimensions += "developer"
     namespace = "com.ssafy.lanterns"
     compileSdk = 35
 
@@ -31,7 +21,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
+        
         // Room 스키마 위치 설정
         javaCompileOptions {
             annotationProcessorOptions {
@@ -51,34 +41,12 @@ android {
             keyAlias = "e204debugkey"
             keyPassword = "team204"
         }
+    
     }
 
-    productFlavors {
-
-        create("dev1") {
-            dimension = "developer"
-            applicationIdSuffix = ".dev1"
-            buildConfigField("String", "PV_ACCESS_KEY", "\"$pvKeyDev1\"")
-            buildConfigField("String","PV_KEYWORD_FILE","\"hey_lantern_dev1.ppn\"")
-        }
-
-        create("dev2") {
-            dimension = "developer"
-            applicationIdSuffix = ".dev2"
-            buildConfigField("String", "PV_ACCESS_KEY", "\"$pvKeyDev2\"")
-            buildConfigField("String","PV_KEYWORD_FILE","\"hey_lantern_dev2.ppn\"")
-        }
-
-
-    }
-
-    sourceSets {
-        getByName("dev1") { assets.srcDirs("src/dev1/assets") }
-        getByName("dev2") { assets.srcDirs("src/dev2/assets") }
-    }
     buildTypes {
         getByName("debug") {
-            signingConfig = signingConfigs.getByName("debug")
+            // signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
         }
         getByName("release") {
@@ -100,14 +68,18 @@ android {
         jvmTarget = "17"
         freeCompilerArgs += listOf(
             "-Xjvm-default=all",
-            "-opt-in=androidx.media3.common.util.UnstableApi"
+            "-opt-in=androidx.media3.common.util.UnstableApi",
+            "-Xskip-metadata-version-check"
         )
+        apiVersion = "1.9"
+        languageVersion = "1.9"
     }
 
     buildFeatures {
         viewBinding = true
         compose = true
         buildConfig = true
+        dataBinding = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -120,6 +92,31 @@ android {
             kotlin.srcDir("build/generated/ksp/$variantName/kotlin")
         }
     }
+    
+    // DataBinding과 KSP 문제 해결을 위한 설정 추가
+    androidComponents {
+        onVariants(selector().all()) { variant ->
+            afterEvaluate {
+                try {
+                    val variantName = variant.name.capitalize()
+                    val kspTask = tasks.getByName("ksp${variantName}Kotlin")
+                    val dataBindingTask = tasks.getByName("dataBindingGenBaseClasses${variantName}")
+                    
+                    kspTask.dependsOn(dataBindingTask)
+                    
+                    if (kspTask is org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompileTool<*>) {
+                        kspTask.source(dataBindingTask.outputs.files)
+                    }
+                } catch (e: Exception) {
+                    println("Warning: Could not configure DataBinding-KSP integration: ${e.message}")
+                }
+            }
+        }
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 dependencies {
@@ -131,6 +128,9 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    // Kotlin 표준 라이브러리 버전 강제 지정
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:1.9.22"))
 
     // Room
     implementation(libs.androidx.room.runtime)
@@ -144,7 +144,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
+    
     // DataStore for token storage
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
@@ -153,13 +153,13 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview.v180)
     implementation(libs.androidx.activity.compose.v170)
     debugImplementation(libs.androidx.compose.ui.tooling)
-
+    
     // Compose Material 관련 의존성
     implementation(libs.androidx.compose.material.icons)
     implementation("androidx.compose.material:material:1.6.5")
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
-
+    
     // Compose Animation
     implementation("androidx.compose.animation:animation:1.6.5")
     implementation("androidx.compose.animation:animation-core:1.6.5")
@@ -170,9 +170,12 @@ dependencies {
 
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-
+    
     // Lifecycle Runtime Compose - LocalLifecycleOwner 지원
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    
+    // 앱 생명주기 감지를 위한 Process Lifecycle Owner
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
 
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.7")
@@ -190,7 +193,7 @@ dependencies {
 
     // GPS
     implementation("com.google.android.gms:play-services-location:21.0.1")
-
+    
     // Porcupine
     implementation("ai.picovoice:porcupine-android:3.0.1")
 }

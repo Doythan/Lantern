@@ -27,6 +27,7 @@ val LanternYellow = Color(0xFFFFC107)     // Main lantern yellow, used across mu
 val LanternYellowDark = Color(0xFFFF9800) // Darker shade of lantern yellow
 val LanternCoreYellow = Color(0xFFFFE082) // Lantern core bright yellow
 val LanternGlowOrange = Color(0xFFFFB74D) // Lantern glow orange
+val LanternOrange = Color(0xFFFF9800)     // Orange color for lantern components
 val LanternWarmWhite = Color(0xFFFFF9C4)  // Lantern highlight warm white
 val LanternShadeDark = Color(0xFF212121)  // Dark background for lantern or contrast
 val LanternParticleColor = Color(0xFFFFE57F) // Light particle color

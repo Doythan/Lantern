@@ -17,6 +17,7 @@ object AppDestinations {
     const val PUBLIC_CHAT_ROUTE = "public_chat"
     const val DIRECT_CHAT_ROUTE = "direct_chat/{userId}"
     const val DIRECT_CHAT_ARG_USER_ID = "userId"
+    const val DIRECT_CHAT_ARG_CHAT_ROOM_ID = "chatRoomId"
 
     const val PROFILE_ROUTE = "profile/{userId}/{name}/{distance}"
     const val PROFILE_ARG_USER_ID = "userId"

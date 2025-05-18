@@ -28,13 +28,15 @@ import androidx.navigation.compose.rememberNavController
 import com.ssafy.lanterns.ui.navigation.AppDestinations
 import com.ssafy.lanterns.ui.theme.*
 import com.ssafy.lanterns.ui.util.getProfileImageResId
+import java.text.SimpleDateFormat
+import java.util.*
 
 /**
  * 채팅 메시지 버블 컴포넌트
  *
  * @param senderName 발신자 이름
  * @param text 메시지 내용
- * @param time 전송 시간
+ * @param time 전송 시간 (밀리초 타임스탬프)
  * @param isMe 내가 보낸 메시지인지 여부
  * @param senderProfileId 발신자 프로필 ID (색상 지정용)
  * @param navController 선택사항: 프로필 클릭 시 프로필 화면으로 이동하기 위한 네비게이션 컨트롤러
@@ -48,7 +50,7 @@ import com.ssafy.lanterns.ui.util.getProfileImageResId
 fun ChatMessageBubble(
     senderName: String,
     text: String,
-    time: String,
+    time: Long,
     isMe: Boolean = false,
     senderProfileId: Int? = null,
     navController: NavController? = null,
@@ -78,6 +80,9 @@ fun ChatMessageBubble(
         bottomStart = if (isMe) 16.dp else 4.dp,
         bottomEnd = if (isMe) 4.dp else 16.dp
     )
+    
+    // 타임스탬프 포맷팅
+    val formattedTime = formatTime(time)
 
     Row(
         modifier = Modifier
@@ -157,7 +162,7 @@ fun ChatMessageBubble(
                     Spacer(modifier = Modifier.height(2.dp))
                     
                     Text(
-                        text = time,
+                        text = formattedTime,
                         style = MaterialTheme.typography.labelSmall, 
                         color = metaTextColor,
                         modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
@@ -202,6 +207,14 @@ fun ChatMessageBubble(
 }
 
 /**
+ * 시간 포맷팅 함수
+ */
+private fun formatTime(timestamp: Long): String {
+    val dateFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+    return dateFormat.format(Date(timestamp))
+}
+
+/**
  * 사용자 프로필 아바타 컴포넌트 - 채팅에서 사용하는 버전
  * 
  * @deprecated 기존 코드와의 호환성을 위해 유지. ProfileAvatar를 대신 사용하세요.
@@ -230,11 +243,12 @@ fun ChatMessageBubblePreview() {
     LanternsTheme { 
         Column(Modifier.background(MaterialTheme.colorScheme.background).padding(8.dp)) {
             val dummyNavController = rememberNavController()
+            val currentTime = System.currentTimeMillis()
 
             ChatMessageBubble(
                 senderName = "나",
                 text = "안녕하세요. 이것은 내가 보낸 메시지입니다. 테마 기본 색상이 적용됩니다.",
-                time = "10:21 PM",
+                time = currentTime,
                 isMe = true,
                 senderProfileId = 0,
                 navController = dummyNavController
@@ -245,7 +259,7 @@ fun ChatMessageBubblePreview() {
             ChatMessageBubble(
                 senderName = "상대방",
                 text = "반갑습니다! 이것은 다른 사람이 보낸 메시지입니다. 테마 기본 색상이 적용됩니다.",
-                time = "10:22 PM",
+                time = currentTime - 60000, // 1분 전
                 isMe = false,
                 senderProfileId = 2,
                 navController = dummyNavController
@@ -255,7 +269,7 @@ fun ChatMessageBubblePreview() {
             ChatMessageBubble(
                 senderName = "나 (커스텀 색상)",
                 text = "이 메시지는 외부에서 지정된 색상(ChatBubbleMine, TextPrimary)을 사용합니다.",
-                time = "10:23 PM",
+                time = currentTime - 120000, // 2분 전
                 isMe = true,
                 senderProfileId = 0,
                 navController = dummyNavController,

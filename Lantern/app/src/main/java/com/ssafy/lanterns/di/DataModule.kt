@@ -1,13 +1,19 @@
-package com.ssafy.lanterns.di // 실제 패키지 경로에 맞게 수정
+package com.ssafy.lanterns.di
 
 import android.content.Context
 // import androidx.credentials.CredentialManager // 제거되었으므로 주석 처리 또는 삭제
 import androidx.room.Room
 import com.ssafy.lanterns.data.database.AppDatabase
+import com.ssafy.lanterns.data.model.Message
 import com.ssafy.lanterns.data.repository.*
 import com.ssafy.lanterns.data.source.ble.advertiser.AdvertiserManager
 import com.ssafy.lanterns.data.source.ble.gatt.GattClientManager
 import com.ssafy.lanterns.data.source.ble.gatt.GattServerManager
+import com.ssafy.lanterns.data.source.local.dao.ChatRoomDao
+import com.ssafy.lanterns.data.source.local.dao.MessageDao
+import com.ssafy.lanterns.data.source.local.dao.UserDao
+import com.ssafy.lanterns.data.source.local.dao.FollowDao
+import com.ssafy.lanterns.data.source.local.dao.CallListDao
 // import com.ssafy.lantern.data.source.ble.scanner.ScannerManager // 제거
 // Hilt import 추가
 import dagger.Binds
@@ -28,13 +34,7 @@ abstract class DataModule { // object -> abstract class
         @Provides
         @Singleton
         fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
-            return Room.databaseBuilder(
-                context,
-                AppDatabase::class.java,
-                "lantern.db"
-            )
-                .fallbackToDestructiveMigration() // 주의: 마이그레이션 전략 필요시 수정
-                .build()
+            return AppDatabase.buildDatabase(context)
         }
 
         @Provides
@@ -51,8 +51,8 @@ abstract class DataModule { // object -> abstract class
         
         @Provides
         @Singleton
-        fun provideMessagesDao(appDatabase: AppDatabase): MessagesDao {
-            return appDatabase.messagesDao()
+        fun provideMessageDao(appDatabase: AppDatabase): MessageDao {
+            return appDatabase.messageDao()
         }
         
         @Provides
@@ -73,12 +73,12 @@ abstract class DataModule { // object -> abstract class
         fun provideUserRepositoryImpl(
             userDao: UserDao,
             chatRoomDao: ChatRoomDao,
-            messagesDao: MessagesDao,
+            messageDao: MessageDao,
             followDao: FollowDao,
             callListDao: CallListDao,
             @ApplicationContext context: Context
         ): UserRepositoryImpl {
-            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao, context)
+            return UserRepositoryImpl(userDao, chatRoomDao, messageDao, followDao, callListDao, context)
         }
 
         // AdvertiserManager, GattServerManager, GattClientManager @Provides도 여기로 이동
@@ -116,6 +116,16 @@ abstract class DataModule { // object -> abstract class
     @Binds
     @Singleton
     abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+
+    // DeviceRepository 바인딩 추가
+    @Binds
+    @Singleton
+    abstract fun bindDeviceRepository(impl: DeviceRepositoryImpl): DeviceRepository
+
+    // ChatRepository 바인딩 추가
+    @Binds
+    @Singleton
+    abstract fun bindChatRepository(impl: ChatRepositoryImpl): ChatRepository
 
     // CredentialManager 관련 코드 없음
 

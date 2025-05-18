@@ -5,15 +5,24 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.time.LocalDateTime
 
-@Entity(tableName = "chat_room")
+@Entity(tableName = "chat_rooms")
 data class ChatRoom(
-    @PrimaryKey
-    @ColumnInfo(name = "chat_room_id")
-    val chatRoomId: Long,
-
-    @ColumnInfo(name = "updated_at")
-    val updatedAt: LocalDateTime,
-
-    @ColumnInfo(name = "participant_id")
-    val participantId: Long
+    @PrimaryKey 
+    @ColumnInfo(name = "chatRoomId", defaultValue = "")
+    val chatRoomId: String,
+    
+    @ColumnInfo(name = "participantId", defaultValue = "0")
+    val participantId: Long,
+    
+    @ColumnInfo(name = "participantNickname", defaultValue = "")
+    val participantNickname: String,
+    
+    @ColumnInfo(name = "participantProfileImageNumber", defaultValue = "1")
+    val participantProfileImageNumber: Int,
+    
+    @ColumnInfo(name = "lastMessage")
+    val lastMessage: String? = null,
+    
+    @ColumnInfo(name = "updatedAt")
+    val updatedAt: LocalDateTime = LocalDateTime.now()
 )

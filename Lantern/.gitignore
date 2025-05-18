@@ -40,4 +40,3 @@ local.properties
 # === Firebase ===
 google-services.json
 
-*.ppn

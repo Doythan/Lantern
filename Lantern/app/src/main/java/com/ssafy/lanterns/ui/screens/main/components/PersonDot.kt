@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.ssafy.lanterns.ui.theme.ConnectionFar
 import com.ssafy.lanterns.ui.theme.ConnectionMedium
 import com.ssafy.lanterns.ui.theme.ConnectionNear
+import com.ssafy.lanterns.ui.theme.LanternYellow
+import com.ssafy.lanterns.ui.theme.LanternYellowDark
 import com.ssafy.lanterns.utils.getConnectionColorByDistance
 
 /**
@@ -29,10 +31,14 @@ fun PersonDot(
     signalStrength: Float, 
     pulseScale: Float,
     glowAlpha: Float,
-    distance: Float = (1f - signalStrength) * 10f // 신호 강도에 따른 가상 거리 계산
+    signalLevel: Int = 1 // 신호 강도 레벨 (1-3)
 ) {
-    // 신호 강도에 따라 색상 결정
-    val dotColor = getConnectionColorByDistance(distance)
+    // 신호 강도 레벨에 따른 색상 결정
+    val dotColor = when (signalLevel) {
+        3 -> ConnectionNear     // 강한 신호
+        2 -> ConnectionMedium   // 중간 신호
+        else -> ConnectionFar   // 약한 신호
+    }
     
     // 더 큰 크기로 설정 (기존 8dp → 12dp)
     val baseSize = 12.dp
@@ -82,6 +88,90 @@ fun PersonDot(
                 .border(
                     width = 1.5.dp, // 테두리 두껍게
                     color = dotColor.copy(alpha = 0.8f), // 색상 더 진하게
+                    shape = CircleShape
+                )
+        )
+    }
+}
+
+/**
+ * 랜턴 도트 컴포넌트 - 랜턴 표시를 위한 특별 도트
+ */
+@Composable
+fun LanternDot(
+    modifier: Modifier = Modifier, 
+    signalStrength: Float, 
+    pulseScale: Float,
+    glowAlpha: Float,
+    distance: Float // 실제 거리 값 사용 (카테고리화된 값)
+) {
+    // 거리에 따른 색상 결정 - 이미 카테고리화된 값 사용
+    val dotColor = getConnectionColorByDistance(distance)
+    
+    // 거리 카테고리에 따른 사이즈 조정
+    val baseSize = when {
+        distance <= 50f -> 16.dp  // 가까운 거리는 더 크게
+        distance <= 100f -> 14.dp // 중간 거리는 기본 크기
+        else -> 12.dp            // 먼 거리는 작게
+    }
+    
+    // 거리 카테고리에 따른 글로우 효과 조정
+    val glowMultiplier = when {
+        distance <= 50f -> 1.6f  // 가까운 거리는 더 밝게
+        distance <= 100f -> 1.4f // 중간 거리는 기본 밝기
+        distance <= 200f -> 1.2f // 먼 거리는 조금 어둡게
+        else -> 0.8f            // 매우 먼 거리는 많이 어둡게
+    }
+    
+    Box(
+        modifier = modifier
+    ) {
+        // 발광 효과 (랜턴 느낌)
+        Box(
+            modifier = Modifier
+                .size(baseSize * 3.5f)
+                .alpha(glowAlpha * signalStrength * glowMultiplier)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            dotColor.copy(alpha = 0.9f),
+                            dotColor.copy(alpha = 0.5f),
+                            dotColor.copy(alpha = 0.0f)
+                        )
+                    ),
+                    shape = CircleShape
+                )
+        )
+        
+        // 중앙 랜턴 점
+        Box(
+            modifier = Modifier
+                .size(baseSize)
+                .align(Alignment.Center)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            LanternYellow,
+                            dotColor
+                        ),
+                        radius = baseSize.value
+                    )
+                )
+                .border(1.5.dp, LanternYellowDark.copy(alpha = 0.9f), CircleShape)
+        )
+        
+        // 랜턴 파동 효과
+        Box(
+            modifier = Modifier
+                .size(baseSize * 2.5f)
+                .scale(pulseScale)
+                .align(Alignment.Center)
+                .alpha(0.7f * signalStrength)
+                .border(
+                    width = 2.dp,
+                    color = dotColor.copy(alpha = 0.8f),
                     shape = CircleShape
                 )
         )

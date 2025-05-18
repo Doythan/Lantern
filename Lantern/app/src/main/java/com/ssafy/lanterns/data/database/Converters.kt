@@ -1,6 +1,7 @@
 package com.ssafy.lanterns.data.database
 
 import androidx.room.TypeConverter
+import com.ssafy.lanterns.data.model.MessageStatus
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -14,4 +15,14 @@ class Converters {
     @TypeConverter
     fun toLocalDateTime(value: String?): LocalDateTime? =
         value?.let { LocalDateTime.parse(it, fmt) }
+
+    @TypeConverter
+    fun fromMessageStatus(status: MessageStatus?): String? {
+        return status?.name
+    }
+
+    @TypeConverter
+    fun toMessageStatus(statusString: String?): MessageStatus? {
+        return statusString?.let { enumValueOf<MessageStatus>(it) }
+    }
 }
