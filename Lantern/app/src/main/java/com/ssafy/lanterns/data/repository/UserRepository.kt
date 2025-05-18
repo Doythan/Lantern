@@ -12,6 +12,7 @@ interface UserRepository {
     suspend fun updateNickname(userId: Long, nickname: String)
     suspend fun getUserById(userId: Long): User?
     suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int)
+    suspend fun getUserByNickname(nickname: String): User? // 추가된 함수
     suspend fun clearAllLocalData()
     suspend fun saveDisplayMode(isDarkMode: Boolean)
     suspend fun getDisplayMode(): Boolean

@@ -37,4 +37,8 @@ interface UserDao {
     // 특정 ID의 사용자 정보 조회
     @Query("SELECT * FROM `user` WHERE user_id = :userId LIMIT 1")
     suspend fun getUserById(userId: Long): User?
+
+    // 닉네임으로 사용자 정보 조회 (추가된 함수)
+    @Query("SELECT * FROM `user` WHERE nickname = :nickname LIMIT 1")
+    suspend fun getUserByNickname(nickname: String): User?
 }

@@ -54,6 +54,10 @@ class UserRepositoryImpl @Inject constructor(
         return userDao.getUserById(userId)
     }
 
+    override suspend fun getUserByNickname(nickname: String): User? {
+        return userDao.getUserByNickname(nickname)
+    }
+
     override suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int) {
         userDao.updateProfileImageNumber(userId, profileImageNumber)
     }

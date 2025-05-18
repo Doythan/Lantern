@@ -8,7 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.items // 여기를 itemsIndexed 대신 items로 변경
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,52 +63,10 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.consumeWindowInsets
 
-// 메시지 데이터 모델
-data class ChatMessage(
-    val id: Int,
-    val sender: String,
-    val text: String,
-    val time: Long,
-    val isMe: Boolean = false,
-    val senderProfileId: Int? = null,
-    val distance: Float = 50f // 거리 기반으로 변경 (미터 단위)
-)
-
-/**
- * BLE를 이용한 공용 채팅 구현 주석
- * 
- * 공용 채팅에서는 BLE를 통해 다음과 같은 기능을 구현할 수 있습니다:
- * 
- * 1. 광고(Advertising): 
- *    - 사용자 정보와 함께 광고 신호를 보내 주변에 자신의 존재를 알림
- *    - 사용자 ID, 이름, 프로필 이미지 정보 등을 페이로드에 포함
- * 
- * 2. 스캔(Scanning):
- *    - 주변의 광고 신호를 스캔하여 다른 사용자 탐색
- *    - 신호 강도(RSSI)를 통해 상대적 거리 계산
- *    - 스캔 결과를 NearbyUsersModal에 표시
- * 
- * 3. GATT 서버:
- *    - 메시지 특성(Characteristic)을 포함한 서비스 제공
- *    - 다른 기기가 연결하여 메시지를 주고받을 수 있도록 함
- * 
- * 4. GATT 클라이언트:
- *    - 탐색된 기기와 연결하여 메시지 교환
- *    - 연결된 모든 기기에 메시지 브로드캐스트 가능
- * 
- * 구현 아키텍처:
- * - 중앙 관리자 기기 없이 P2P 방식으로 통신
- * - 메시지 전송 시 연결된 모든 기기에 브로드캐스트
- * - 메시지는 임시 ID와 함께 전송하여 중복 수신 방지
- * - 사용자 접근성에 따라 메시지 필터링 가능 (거리 기반)
- */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -120,111 +78,87 @@ fun PublicChatScreen(
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    val shouldShowScrollToBottom by remember { derivedStateOf { listState.firstVisibleItemIndex > 3 } }
+    val shouldShowScrollToBottom by remember { derivedStateOf { listState.firstVisibleItemIndex > 3 && listState.layoutInfo.totalItemsCount > 0 } }
     var showUsersModal by remember { mutableStateOf(false) }
     var messageInput by remember { mutableStateOf("") }
-    
-    // 메시지 전송 가능 상태 (딜레이를 위한 상태 추가)
     var canSendMessage by remember { mutableStateOf(true) }
-    
-    // 주변 사용자 목록
+
     val nearbyUsers = remember { mutableStateListOf<ChatUser>() }
-    
     val currentUser by viewModel.currentUser
-    val messages by viewModel.messages
-    
-    // 객체 생성
+    val messages by viewModel.messages // ViewModel의 messages 상태를 관찰
+
     val context = LocalContext.current
-    
-    // 메시지 전송 함수 정의
+
     fun sendMessage() {
         if (messageInput.isBlank() || !canSendMessage) return
-        
-        val senderName = currentUser?.nickname ?: "나"
-        
-        val newMessage = ChatMessage(
-            viewModel.getNextMessageId(),
-            senderName,
-            messageInput.trim(),
-            System.currentTimeMillis(),
-            true // 내가 보낸 메시지임을 표시
+
+        val senderName = currentUser?.nickname ?: "나" // currentUser가 null이면 "나"로 표시
+        val newChatMessage = ChatMessage(
+            // id는 ViewModel에서 DB 저장 시 자동 생성되거나 타임스탬프 등으로 관리되므로 여기서는 0으로 전달하거나 ViewModel에서 처리
+            id = 0, // 임시 ID 또는 ViewModel에서 생성하도록 변경
+            sender = senderName,
+            text = messageInput.trim(),
+            time = System.currentTimeMillis(),
+            isMe = true, // 내가 보낸 메시지
+            senderProfileId = currentUser?.selectedProfileImageNumber
         )
-        
-        // 메시지 추가 (UI에 메시지 표시)
-        viewModel.addMessage(newMessage)
-        
-        // 메시지 바이트 길이 제한 확인 및 분할
+
+        viewModel.addMessage(newChatMessage) // ViewModel을 통해 메시지 추가 (DB 저장 포함)
+
+        // BLE 광고 로직 (기존 유지)
         val splitList = splitMessageByByteLength(messageInput)
-        
-        // 로그 확인
         Log.d("PublicChat", "메시지 전송: $messageInput, 분할된 메시지: ${splitList.size}개 패킷")
-        
-        // BLE 광고 시작 - 메시지 브로드캐스트
         AdvertiserManager.startAdvertising(
             messageList = splitList,
             email = senderName,
             activity = context as Activity,
             state = 0
         )
-        
-        // 입력란 초기화
+
         messageInput = ""
-        
-        // 메시지 전송 후 딜레이 설정 (1.5초)
         canSendMessage = false
         coroutineScope.launch {
-            delay(1500) // 1.5초 딜레이
+            delay(1500)
             canSendMessage = true
         }
     }
-    
+
     LaunchedEffect(Unit) {
-        // PermissionHelper 객체 생성
         val permissionHelper = PermissionHelper(context as Activity)
         ScannerManager.init(context as Activity)
         AdvertiserManager.init(context as Activity)
 
-        // 권한이 없다면 요청
-        if(!permissionHelper.hasPermission()) permissionHelper.requestPermissions(1001);
-        // 있다면
-        else{
-            // 블루투스를 사용자가 켰는지 확인
-            if(permissionHelper.isBluetoothEnabeld()) {
-                // 스캔 시작 - 메시지와 사용자 정보 수신
-                ScannerManager.startScanning(context){ sender, text ->
-                    // 메시지 수신 처리
-                    val newMessage = ChatMessage(
-                        id = viewModel.getNextMessageId(),
+        if (!permissionHelper.hasPermission()) permissionHelper.requestPermissions(1001)
+        else {
+            if (permissionHelper.isBluetoothEnabeld()) {
+                ScannerManager.startScanning(context) { sender, text ->
+                    val receivedMessage = ChatMessage(
+                        id = viewModel.getNextMessageId(), // ViewModel 통해 ID 생성
                         sender = sender,
                         text = text,
                         time = System.currentTimeMillis(),
                         isMe = false,
-                        senderProfileId = null,
+                        senderProfileId = null, // 필요시 스캔 결과에서 프로필 ID 추출
                         distance = 0f
                     )
-                    viewModel.addMessage(newMessage)
-                    
-                    // 발신자가 주변 사용자 목록에 없으면 추가
+                    viewModel.addMessage(receivedMessage) // ViewModel 통해 수신 메시지 추가 (DB 저장 포함)
+
                     if (sender != "Unknown" && nearbyUsers.none { it.name == sender }) {
                         nearbyUsers.add(
                             ChatUser(
                                 id = nearbyUsers.size + 1,
                                 name = sender,
-                                distance = 100f, // 기본 거리
-                                messageCount = 1f // 기본 메시지 개수
+                                distance = 100f,
+                                messageCount = 1f
                             )
                         )
                     }
                 }
-            }
-            else Log.d("1234", "블루투스가 활성화되지 않았습니다.")
+            } else Log.d("1234", "블루투스가 활성화되지 않았습니다.")
         }
-
-        // 초기 메시지 설정 (ViewModel)
-        viewModel.initializeDefaultMessages()
+        // ViewModel의 initializeDefaultMessages는 ViewModel의 init 블록에서 호출되므로 여기서 중복 호출 필요 없음
     }
 
-    // 화면이 사라질 때 광고/스캔 정지
     DisposableEffect(Unit) {
         onDispose {
             Log.d("Compose", "💨 PublicChatScreen dispose - stopping BLE")
@@ -232,19 +166,20 @@ fun PublicChatScreen(
             ScannerManager.stopScanning()
         }
     }
-    
-    // 메시지 스크롤 효과
+
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(0)
+        if (messages.isNotEmpty() && listState.firstVisibleItemIndex < 2 && listState.firstVisibleItemScrollOffset == 0) { // 자동 스크롤 조건 강화
+            coroutineScope.launch {
+                listState.animateScrollToItem(0) // 새 메시지 오면 맨 아래로 스크롤 (LazyColumn의 reverseLayout=true)
+            }
         }
     }
-    
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection)
-            .statusBarsPadding(), // systemBarsPadding() 대신 statusBarsPadding()만 적용
+            .statusBarsPadding(),
         contentColor = MaterialTheme.colorScheme.onBackground,
         color = MaterialTheme.colorScheme.background
     ) {
@@ -255,7 +190,6 @@ fun PublicChatScreen(
                 .padding(paddingValues)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // 탑 앱바
                 TopAppBar(
                     title = {
                         Text(
@@ -274,7 +208,6 @@ fun PublicChatScreen(
                         }
                     },
                     actions = {
-                        // 참여자 수 아이콘
                         IconButton(onClick = { showUsersModal = true }) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -286,8 +219,7 @@ fun PublicChatScreen(
                                     tint = MaterialTheme.colorScheme.secondary
                                 )
                                 Text(
-                                    // 현재 사용자(나) + 다른 주변 사용자 표시
-                                    text = (nearbyUsers.size + 1).toString(),
+                                    text = (nearbyUsers.size + (if (currentUser != null) 1 else 0)).toString(), // 나 포함
                                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
@@ -303,8 +235,7 @@ fun PublicChatScreen(
                     ),
                     scrollBehavior = scrollBehavior
                 )
-                
-                // 메시지 목록
+
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -312,16 +243,16 @@ fun PublicChatScreen(
                         .background(MaterialTheme.colorScheme.background)
                         .padding(horizontal = 8.dp),
                     state = listState,
-                    reverseLayout = true, // DirectChatScreen과 일관되게 설정
+                    reverseLayout = true, // 새 메시지가 아래에 추가되도록
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(messages.reversed()) { msg -> // 메시지를 역순으로 표시
+                    items(messages, key = { it.time }) { msg -> // id 대신 time을 key로 사용하거나 고유 ID 생성 로직 확인
                         ChatMessageBubble(
-                            senderName = if (msg.isMe) "나" else msg.sender,
+                            senderName = if (msg.isMe) currentUser?.nickname ?: "나" else msg.sender,
                             text = msg.text,
                             time = formatTime(msg.time),
                             isMe = msg.isMe,
-                            senderProfileId = msg.senderProfileId,
+                            senderProfileId = if(msg.isMe) currentUser?.selectedProfileImageNumber else msg.senderProfileId,
                             navController = navController,
                             distance = msg.distance,
                             chatBubbleColor = if (msg.isMe) ChatBubbleMine else ChatBubbleOthers,
@@ -331,8 +262,7 @@ fun PublicChatScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
-                
-                // 메시지 입력창 영역
+
                 PublicChatInputRow(
                     message = messageInput,
                     onMessageChange = { messageInput = it },
@@ -341,8 +271,7 @@ fun PublicChatScreen(
                     modifier = Modifier
                 )
             }
-            
-            // 주변 사용자 목록 모달
+
             AnimatedVisibility(
                 visible = showUsersModal,
                 enter = fadeIn(),
@@ -358,6 +287,8 @@ fun PublicChatScreen(
     }
 }
 
+// PublicChatInputRow, getCurrentTimeFormatted, splitMessageByByteLength, formatTime 함수는 기존과 동일하게 유지
+
 @Composable
 fun PublicChatInputRow(
     message: String,
@@ -369,8 +300,8 @@ fun PublicChatInputRow(
     Column(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .navigationBarsPadding() // 내비게이션 바 패딩 유지
-            .imePadding() // exclude 대신 단순 imePadding() 적용
+            .navigationBarsPadding()
+            .imePadding()
     ) {
         Row(
             modifier = Modifier
@@ -402,22 +333,14 @@ fun PublicChatInputRow(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = "전송",
-                            tint = if (message.isNotBlank() && isSendEnabled) 
-                                   MaterialTheme.colorScheme.secondary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            tint = if (message.isNotBlank() && isSendEnabled)
+                                MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun PublicChatScreenPreview() {
-    LanternsTheme {
-        PublicChatScreen(navController = NavController(LocalContext.current))
     }
 }
 
@@ -459,9 +382,17 @@ private fun formatTime(timestamp: Long): String {
     }
     val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
     val minute = calendar.get(java.util.Calendar.MINUTE)
-    
+
     val amPm = if (hour < 12) "오전" else "오후"
     val hour12 = if (hour == 0 || hour == 12) 12 else hour % 12
-    
+
     return "$amPm ${hour12}:${minute.toString().padStart(2, '0')}"
+}
+
+@Preview(showBackground = true)
+@Composable
+fun PublicChatScreenPreview() {
+    LanternsTheme {
+        PublicChatScreen(navController = NavController(LocalContext.current))
+    }
 }

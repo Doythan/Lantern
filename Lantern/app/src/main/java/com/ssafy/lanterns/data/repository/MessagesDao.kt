@@ -30,7 +30,7 @@ interface MessagesDao {
     @Query("""
         SELECT * FROM messages
         WHERE chat_room_id = :chatRoomId
-        ORDER BY date DESC
+        ORDER BY date ASC 
         LIMIT :limit OFFSET :offset
     """)
     suspend fun getMessages(
@@ -45,7 +45,7 @@ interface MessagesDao {
         SELECT * FROM messages
         WHERE chat_room_id = :chatRoomId
           AND date < :beforeDate
-        ORDER BY date DESC
+        ORDER BY date ASC
         LIMIT :limit
     """)
     suspend fun getMessagesBefore(
@@ -58,5 +58,8 @@ interface MessagesDao {
     // 모든 메시지 정보 삭제
     @Query("DELETE FROM messages")
     suspend fun deleteAllMessages()
+
+
+
 
 }

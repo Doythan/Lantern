@@ -5,9 +5,6 @@ import android.content.Context
 import androidx.room.Room
 import com.ssafy.lanterns.data.database.AppDatabase
 import com.ssafy.lanterns.data.repository.*
-import com.ssafy.lanterns.data.source.ble.advertiser.AdvertiserManager
-import com.ssafy.lanterns.data.source.ble.gatt.GattClientManager
-import com.ssafy.lanterns.data.source.ble.gatt.GattServerManager
 // import com.ssafy.lantern.data.source.ble.scanner.ScannerManager // 제거
 // Hilt import 추가
 import dagger.Binds
@@ -79,25 +76,6 @@ abstract class DataModule { // object -> abstract class
             @ApplicationContext context: Context
         ): UserRepositoryImpl {
             return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao, context)
-        }
-
-        // AdvertiserManager, GattServerManager, GattClientManager @Provides도 여기로 이동
-        @Provides
-        @Singleton
-        fun provideAdvertiserManager(@ApplicationContext context: Context): AdvertiserManager {
-            return AdvertiserManager(context)
-        }
-
-        @Provides
-        @Singleton
-        fun provideGattServerManager(@ApplicationContext context: Context): GattServerManager {
-            return GattServerManager(context, { _, _, _ -> }, { _ -> }, { _ -> })
-        }
-
-        @Provides
-        @Singleton
-        fun provideGattClientManager(@ApplicationContext context: Context): GattClientManager {
-            return GattClientManager(context, { _, _, _ -> }, { _, _ -> })
         }
     }
 
