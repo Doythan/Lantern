@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "c8e45e2e501b3e387cfe2cc208d1346e",
+    "identityHash": "20669a4c2c33eb5b1eebae8a83827968",
     "entities": [
       {
         "tableName": "user",
@@ -139,7 +139,7 @@
       },
       {
         "tableName": "messages",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`message_id` INTEGER NOT NULL, `user_id` INTEGER NOT NULL, `chat_room_id` INTEGER NOT NULL, `text` TEXT NOT NULL, `date` TEXT NOT NULL, PRIMARY KEY(`message_id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`message_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `user_id` INTEGER NOT NULL, `chat_room_id` INTEGER NOT NULL, `text` TEXT NOT NULL, `date` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "messageId",
@@ -173,7 +173,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": false,
+          "autoGenerate": true,
           "columnNames": [
             "message_id"
           ]
@@ -249,7 +249,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c8e45e2e501b3e387cfe2cc208d1346e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '20669a4c2c33eb5b1eebae8a83827968')"
     ]
   }
 }

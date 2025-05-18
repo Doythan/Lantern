@@ -7,9 +7,9 @@ import java.time.LocalDateTime
 
 @Entity(tableName = "messages")
 data class Messages(
-    @PrimaryKey
+    @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "message_id")
-    val messageId: Long,
+    val messageId: Long = 0L,
 
     @ColumnInfo(name = "user_id")
     val userId: Long,

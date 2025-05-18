@@ -54,6 +54,10 @@ class UserRepositoryImpl @Inject constructor(
         return userDao.getUserById(userId)
     }
 
+    override suspend fun getUserByNickname(nickname: String): User? {
+        return userDao.getUserByNickname(nickname)
+    }
+
     override suspend fun updateProfileImageNumber(userId: Long, profileImageNumber: Int) {
         userDao.updateProfileImageNumber(userId, profileImageNumber)
     }
@@ -91,5 +95,9 @@ class UserRepositoryImpl @Inject constructor(
         val isDarkMode = sharedPrefs.getBoolean(KEY_DARK_MODE, true) // 기본값은 다크모드
         Log.d("UserRepositoryImpl", "디스플레이 모드 불러오기: $isDarkMode")
         return isDarkMode
+    }
+
+    override suspend fun insertLocalUser(user: User): Long {
+        return userDao.insertUser(user)
     }
 }
