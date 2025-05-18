@@ -24,7 +24,7 @@ import com.ssafy.lanterns.data.repository.UserDao
         Follow::class,
         ChatRoom::class
     ],
-    version = 2,
+    version = 3,
     autoMigrations = [
         AutoMigration(from = 1, to = 2)
     ],// 버전 2로 업데이트
