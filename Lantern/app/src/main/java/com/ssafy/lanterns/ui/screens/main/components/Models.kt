@@ -1,18 +1,18 @@
 package com.ssafy.lanterns.ui.screens.main.components
 
+import kotlin.random.Random
+
 /**
  * 주변 사람 데이터 모델
  */
 data class NearbyPerson(
-    val bleId: String, // BLE에서 받은 고유 ID (예: "123")
-    val userId: Long,  // 로컬 DB에서 발급받은 사용자 PK
-    val name: String,
-    val distance: Float,
-    val angle: Float,
-    val signalStrength: Float,
-    val avatarSeed: Int = bleId.hashCode(), // 아바타 시드를 bleId 기반으로 변경
-    val rssi: Int,
-    val signalLevel: Int = 1 // 신호 강도 레벨 (1: 약함, 2: 중간, 3: 강함)
+    val id: Int,
+    val userId: String = id.toString(), // 사용자 고유 ID 추가
+    val distance: Float, // 거리 (미터 단위)
+    val angle: Float,    // 시계 방향으로 각도 (0-360도)
+    val signalStrength: Float, // 신호 강도 (0.0-1.0)
+    val name: String = generateRandomName(), // 랜덤 이름
+    val avatarSeed: Int = Random.nextInt(100) // 아바타 생성용 시드
 )
 
 /**
@@ -32,4 +32,13 @@ data class AnimationValues(
 data class RippleState(
     val visible: Boolean,
     val animationValue: Float
-) 
+)
+
+/**
+ * 랜덤 이름 생성 함수
+ */
+fun generateRandomName(): String {
+    val firstNames = listOf("김", "이", "박", "최", "정", "강", "조", "윤", "장", "임")
+    val lastNames = listOf("민준", "지훈", "준호", "도윤", "서연", "지은", "하은", "수빈", "예은", "민서")
+    return "${firstNames.random()}${lastNames.random()}"
+} 
