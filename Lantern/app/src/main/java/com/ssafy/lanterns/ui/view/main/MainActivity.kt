@@ -194,6 +194,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+
     private fun startWakeWordService() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED &&
             Settings.canDrawOverlays(this)
@@ -212,5 +213,10 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this, "'다른 앱 위에 표시' 권한이 필요합니다.", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    fun triggerEmergencyFromActivity() {
+        Log.d("MainActivity", "Activity를 통해 긴급 방송 요청 수신")
+        mainViewModel.triggerEmergencyBroadcast()
     }
 }

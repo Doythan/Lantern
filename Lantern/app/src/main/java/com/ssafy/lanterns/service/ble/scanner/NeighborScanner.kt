@@ -494,7 +494,7 @@ object NeighborScanner {
                 throw IllegalArgumentException("긴급 플래그 읽기 위한 버퍼 부족 (1 byte)")
             }
             val isEmergencyFlag = buffer.get()
-
+            Log.d(TAG, "Parsed Packet: sID=$serverUserId, Nick='$nickname', Depth=$advertisedOwnDepth, Emergency=$isEmergencyFlag")
 
             return ParsedAdPacket(serverUserId, advertisedOwnDepth, nickname, isEmergencyFlag)
         } catch (e: Exception) {

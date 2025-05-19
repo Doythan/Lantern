@@ -178,7 +178,7 @@ fun MainContent(
         // 3. 주변 사람 점 표시
         nearbyPeopleToDisplay.forEach { person ->
             // 디버그 로그 추가
-            Log.d("MainContent", "PersonDot 렌더링: id=${person.serverUserIdString}, 닉네임=${person.nickname}, depth=${person.calculatedVisualDepth}, signalLevel=${person.signalLevel}")
+           // Log.d("MainContent", "PersonDot 렌더링: id=${person.serverUserIdString}, 닉네임=${person.nickname}, depth=${person.calculatedVisualDepth}, signalLevel=${person.signalLevel}")
             
             // 원형 레이더에서의 위치 계산 - 수정된 로직
             val depthRatio = person.calculatedVisualDepth.toFloat() / displayDepthLevel.coerceAtLeast(1)
@@ -190,7 +190,7 @@ fun MainContent(
             val y = radius * sin(angleInRadians).toFloat()
             
             // 로그 추가: 계산된 위치 정보
-            Log.d("MainContent", "도트 위치 계산: depthRatio=$depthRatio, radius=$radius, x=$x, y=$y")
+            // Log.d("MainContent", "도트 위치 계산: depthRatio=$depthRatio, radius=$radius, x=$x, y=$y")
             
             Box(
                 modifier = Modifier

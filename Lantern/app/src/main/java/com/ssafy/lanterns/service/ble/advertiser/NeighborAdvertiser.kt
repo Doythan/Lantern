@@ -55,6 +55,7 @@ object NeighborAdvertiser {
             Log.e(TAG, "Activity null, 광고 불가")
             return
         }
+        Log.i(TAG, "광고 시작 요청: sID=$serverUserId, Nick='$processedNickname', MyDepth=$currentOwnAdvertisedDepth, Emergency=$isEmergency")
         
         val advertiser = bluetoothLeAdvertiser ?: run { 
             Log.e(TAG, "Advertiser null, 광고 불가")
