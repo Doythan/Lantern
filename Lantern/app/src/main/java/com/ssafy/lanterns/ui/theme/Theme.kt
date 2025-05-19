@@ -147,7 +147,7 @@ private val Theme3LightColors = lightColorScheme(
 @Composable
 fun LanternsTheme(
     themeNumber: Int = 1, // 1: 기본, 2: 블루, 3: 퍼플
-    darkTheme: Boolean = isSystemInDarkTheme(), // 사용자 설정 또는 시스템 다크 모드
+    darkTheme: Boolean = true, // 다크 모드를 기본값으로 설정
     dynamicColor: Boolean = false, // API 31+ 에서 Wallpaper 색상 기반 동적 테마 사용 여부
     content: @Composable () -> Unit
 ) {

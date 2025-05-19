@@ -61,8 +61,8 @@ import com.ssafy.lanterns.ui.theme.ConnectionFar
 import com.ssafy.lanterns.ui.theme.ConnectionMedium
 import com.ssafy.lanterns.ui.theme.ConnectionNear
 import com.ssafy.lanterns.ui.theme.LanternYellow
-import com.ssafy.lanterns.utils.getConnectionColorByDistance
-import com.ssafy.lanterns.utils.getConnectionStrengthText
+import com.ssafy.lanterns.utils.getConnectionColorBySignalLevel
+import com.ssafy.lanterns.utils.getConnectionStrengthTextFromSignalLevel
 
 // 이징 애니메이션 커브 (모달 애니메이션용)
 private val EaseOutQuart = CubicBezierEasing(0.25f, 1f, 0.5f, 1f)
@@ -75,8 +75,8 @@ private val EaseInQuad = CubicBezierEasing(0.55f, 0.085f, 0.68f, 0.53f)
 fun NearbyPersonListModal(
     people: List<NearbyPerson>,
     onDismiss: () -> Unit,
-    onPersonClick: (userId: String) -> Unit,
-    onCallClick: (userId: String) -> Unit
+    onPersonClick: (serverUserIdString: String) -> Unit,
+    onCallClick: (serverUserIdString: String) -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -134,7 +134,7 @@ fun NearbyPersonListModal(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "주변에 탐지된 사람 (${people.size})",
+                                text = "주변에 탐지된 랜턴 (${people.size})",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -150,17 +150,24 @@ fun NearbyPersonListModal(
                         
                         Divider(color = MaterialTheme.colorScheme.outlineVariant)
                         
-                        // 사람 목록
+                        // 사람 목록 - Depth와 신호 강도 기준으로 정렬
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                             contentPadding = PaddingValues(vertical = 8.dp)
                         ) {
-                            items(people.sortedBy { it.distance }) { person ->
+                            items(
+                                // 정렬 기준: 1) Depth가 낮은 순(가까운 순), 2) 신호 강도가 높은 순, 3) RSSI가 높은 순
+                                people.sortedWith(
+                                    compareBy<NearbyPerson> { it.calculatedVisualDepth }
+                                        .thenByDescending { it.signalLevel }
+                                        .thenByDescending { it.rssi }
+                                )
+                            ) { person ->
                                 PersonListItemWithButtons(
                                     person = person,
-                                    onChatClick = { onPersonClick(person.userId) },
-                                    onCallClick = { onCallClick(person.userId) }
+                                    onChatClick = { onPersonClick(person.serverUserIdString) },
+                                    onCallClick = { onCallClick(person.serverUserIdString) }
                                 )
                             }
                         }
@@ -180,10 +187,11 @@ fun PersonListItemWithButtons(
     onChatClick: () -> Unit,
     onCallClick: () -> Unit
 ) {
-    val connectionColor = getConnectionColorByDistance(person.distance)
+    val connectionColor = getConnectionColorBySignalLevel(person.signalLevel)
+    val connectionText = getConnectionStrengthTextFromSignalLevel(person.signalLevel)
     
-    // 통화 버튼은 100m 이내의 사용자에게만 활성화
-    val isCallEnabled = person.distance <= 100f
+    // 통화 버튼은 신호 강도가 가장 강한 경우(Level 3)에만 활성화
+    val isCallEnabled = person.signalLevel >= 3
     
     Card(
         modifier = Modifier
@@ -207,7 +215,7 @@ fun PersonListItemWithButtons(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 아바타 이미지
+                // 아바타 이미지 - 신호 강도에 따라 테두리 색상 변경
                 Box(
                     modifier = Modifier
                         .size(50.dp)
@@ -220,7 +228,7 @@ fun PersonListItemWithButtons(
                                 )
                             )
                         )
-                        .border(width = 2.dp, color = connectionColor.copy(alpha = 0.5f), shape = CircleShape),
+                        .border(width = 2.dp, color = connectionColor.copy(alpha = 0.7f), shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
@@ -235,7 +243,7 @@ fun PersonListItemWithButtons(
                 // 사용자 정보
                 Column {
                     Text(
-                        text = person.name,
+                        text = person.nickname, // nickname 사용
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -244,21 +252,44 @@ fun PersonListItemWithButtons(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     
-                    // 거리 정보
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = connectionColor.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    // 연결 정보 (홉수 및 신호 강도)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${person.distance.toInt()} m",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = connectionColor
-                        )
+                        // 홉수 표시
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "${person.calculatedVisualDepth}홉",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        // 신호 강도 표시
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    color = connectionColor.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = connectionText,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = connectionColor
+                            )
+                        }
                     }
                 }
             }
@@ -286,7 +317,7 @@ fun PersonListItemWithButtons(
                     )
                 }
                 
-                // 통화 버튼 (100m 이내일 때만 활성화)
+                // 통화 버튼 (신호 강도 Level 3일 때만 활성화)
                 IconButton(
                     onClick = onCallClick,
                     enabled = isCallEnabled,

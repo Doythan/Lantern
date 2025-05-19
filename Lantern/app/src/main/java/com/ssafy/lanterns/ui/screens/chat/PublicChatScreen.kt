@@ -125,13 +125,23 @@ fun PublicChatScreen(
 
     LaunchedEffect(Unit) {
         val permissionHelper = PermissionHelper(context as Activity)
+        Log.d("PublicChatScreen", "LaunchedEffect 시작")
         ScannerManager.init(context as Activity)
         AdvertiserManager.init(context as Activity)
 
-        if (!permissionHelper.hasPermission()) permissionHelper.requestPermissions(1001)
-        else {
-            if (permissionHelper.isBluetoothEnabeld()) {
-                ScannerManager.startScanning(context) { sender, text ->
+        val hasPermissionResult = permissionHelper.hasPermission()
+        val isBluetoothEnabledResult = permissionHelper.isBluetoothEnabeld()
+
+        Log.d("PublicChatScreen", "권한 상태: $hasPermissionResult, 블루투스 활성화 상태: $isBluetoothEnabledResult")
+
+        if (!hasPermissionResult) {
+            Log.d("PublicChatScreen", "권한 없음. 권한 요청 시도.")
+            permissionHelper.requestPermissions(1001)
+        } else {
+            Log.d("PublicChatScreen", "권한 있음.")
+            if (isBluetoothEnabledResult) {
+                Log.d("PublicChatScreen", "블루투스 활성화됨. 스캔 시작 시도.")
+                ScannerManager.startScanning(context as Activity) { sender, text ->
                     val receivedMessage = ChatMessage(
                         id = viewModel.getNextMessageId(), // ViewModel 통해 ID 생성
                         sender = sender,
@@ -154,7 +164,9 @@ fun PublicChatScreen(
                         )
                     }
                 }
-            } else Log.d("1234", "블루투스가 활성화되지 않았습니다.")
+            } else {
+                Log.d("PublicChatScreen", "블루투스가 활성화되지 않았습니다. 스캔 시작 안함.")
+            }
         }
         // ViewModel의 initializeDefaultMessages는 ViewModel의 init 블록에서 호출되므로 여기서 중복 호출 필요 없음
     }
@@ -163,7 +175,7 @@ fun PublicChatScreen(
         onDispose {
             Log.d("Compose", "💨 PublicChatScreen dispose - stopping BLE")
             AdvertiserManager.stopAdvertising()
-            ScannerManager.stopScanning()
+            ScannerManager.stopScanning(context as Activity)
         }
     }
 

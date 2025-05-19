@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
@@ -20,38 +21,49 @@ class PermissionHelper(private val activity: Activity) {
     }
 
     // bluetooth permission을 가지고 있는지
-    fun hasPermission(): Boolean{
-
-        // 권한 이름을 배열에 저장한다.
-        // String 배열
-        val permissions = arrayOf(
-            Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.BLUETOOTH_ADVERTISE,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-
-        // 배열에 원소 하나 하나에 대해서 내가 정한 조건을 확인한다.
-        // it가 원소
-        return permissions.all{
+    fun hasPermission(): Boolean {
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Android 12 (API 31) 이상
+            // BLUETOOTH_SCAN에 neverForLocation 플래그가 있으므로, ACCESS_FINE_LOCATION은 필수가 아님.
+            arrayOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            )
+        } else {
+            // Android 11 (API 30) 이하
+            arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION // 스캔에 필수
+            )
+        }
+        return permissions.all {
             ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     // bluetooth 권한 요청
     // 일단은 모든 요청을 하는 씩으로 개발하고 나중에 뭔가 터지면 그 때 바꾸자
-    fun requestPermissions(requestCode: Int){
-        val permissions = arrayOf(
-            Manifest.permission.BLUETOOTH,
-            Manifest.permission.BLUETOOTH_ADMIN,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.BLUETOOTH_ADVERTISE,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-
-        ActivityCompat.requestPermissions(activity, permissions, requestCode)
+    fun requestPermissions(requestCode: Int) {
+        val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            mutableListOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE
+            )
+            // ACCESS_FINE_LOCATION 요청은 AndroidManifest.xml의 BLUETOOTH_SCAN 설정과 앱의 요구사항에 따라 결정
+            // 현재 neverForLocation이므로, 여기서는 명시적으로 요청하지 않음.
+            // 만약 다른 이유로 위치 권한이 필요하다면 여기에 추가.
+        } else {
+            mutableListOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+        if (permissionsToRequest.isNotEmpty()){ // 요청할 권한이 있을 때만 요청
+            ActivityCompat.requestPermissions(activity, permissionsToRequest.toTypedArray(), requestCode)
+        }
     }
 }

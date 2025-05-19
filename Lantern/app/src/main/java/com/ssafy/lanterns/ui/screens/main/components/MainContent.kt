@@ -1,5 +1,6 @@
 package com.ssafy.lanterns.ui.screens.main.components
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -9,29 +10,36 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -52,6 +60,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ssafy.lanterns.config.NeighborDiscoveryConstants
 import com.ssafy.lanterns.ui.theme.BleAccent
 import com.ssafy.lanterns.ui.theme.BleBlue1
 import com.ssafy.lanterns.ui.theme.BleBlue2
@@ -60,6 +69,7 @@ import com.ssafy.lanterns.ui.theme.BluetoothColor
 import com.ssafy.lanterns.ui.theme.BluetoothGlowColor
 import com.ssafy.lanterns.ui.theme.TextWhite
 import com.ssafy.lanterns.utils.getConnectionColorByDistance
+import com.ssafy.lanterns.utils.getConnectionColorBySignalLevel
 import kotlin.math.cos
 import kotlin.math.sin
 import com.ssafy.lanterns.ui.theme.LanternYellow
@@ -77,172 +87,206 @@ import com.ssafy.lanterns.ui.theme.RadarLineColor
  */
 @Composable
 fun MainContent(
-    @Suppress("UNUSED_PARAMETER") // 현재 직접 사용하지 않지만 향후 사용 예정
     isScanning: Boolean,
-    onScanToggle: () -> Unit, // 더 이상 사용하지 않지만 호환성을 위해 유지
-    nearbyPeople: List<NearbyPerson>,
+    nearbyPeopleToDisplay: List<NearbyPerson>,
+    currentSelfDepth: Int,
+    displayDepthLevel: Int,
+    onDisplayDepthChange: (Int) -> Unit,
     showPersonListModal: Boolean,
     onShowListToggle: () -> Unit,
-    onPersonClick: (userId: String) -> Unit,
-    onCallClick: (userId: String) -> Unit,
+    onDismissModal: () -> Unit,
+    onPersonClick: (serverUserIdString: String) -> Unit,
+    onCallClick: (serverUserIdString: String) -> Unit,
     rippleStates: Triple<RippleState, RippleState, RippleState>,
     animationValues: AnimationValues,
     buttonText: String,
     subTextVisible: Boolean,
-    showListButton: Boolean
+    showListButton: Boolean,
+    onCheckBluetoothState: () -> Unit
 ) {
-    // 리플 애니메이션 상태
-    val (ripple1, ripple2, ripple3) = rippleStates
-    
-    // 리플 파동 효과
-    Box(
+    // BoxWithConstraints를 통해 레이더 크기를 화면에 맞게 조정
+    BoxWithConstraints(
         modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center // 전체 Box의 내용을 중앙 정렬
+        contentAlignment = Alignment.Center
     ) {
-        // 주변 랜턴 개수 표시 (상단에 배치 - 패딩값 줄임)
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 8.dp) // 상단 패딩 줄임 (24dp → 8dp)
-                .padding(horizontal = 20.dp)
-        ) {
-            NearbyLanternCount(count = nearbyPeople.size)
-        }
+        val maxSize = minOf(this.maxWidth, this.maxHeight) * 0.7f
+        val radarSize = maxSize
         
-        // 첫 번째 리플
+        // 리플 애니메이션 상태
+        val (ripple1, ripple2, ripple3) = rippleStates
+        
+        // 1. 리플 효과
         if (ripple1.visible) {
             RippleCircle(
                 scale = 1f + ripple1.animationValue * 3.0f,
                 alpha = (1f - ripple1.animationValue) * 0.5f,
-                color = BleBlue2.copy(alpha = 0.3f)  // 첫 번째 파동은 밝은 시안
+                color = BleBlue2.copy(alpha = 0.3f)
             )
         }
         
-        // 두 번째 리플
         if (ripple2.visible) {
             RippleCircle(
                 scale = 1f + ripple2.animationValue * 3.0f,
                 alpha = (1f - ripple2.animationValue) * 0.5f,
-                color = BleBlue1.copy(alpha = 0.3f)  // 두 번째 파동은 깊은 파란색
+                color = BleBlue1.copy(alpha = 0.3f)
             )
         }
 
-        // 세 번째 리플
         if (ripple3.visible) {
             RippleCircle(
                 scale = 1f + ripple3.animationValue * 3.0f,
                 alpha = (1f - ripple3.animationValue) * 0.5f,
-                color = BleAccent.copy(alpha = 0.2f)  // 세 번째 파동은 네온 민트
+                color = BleAccent.copy(alpha = 0.2f)
             )
         }
         
-        // 주변 사람 점 표시
-        nearbyPeople.forEach { person ->
-            // 중앙 버튼의 크기(160dp)보다 최소 40dp 이상 떨어지도록 설정
-            // 160dp/2 + 40dp = 120dp가 최소 반경
-            val minRadius = 120.0 // 중앙 버튼과 겹치지 않는 최소 반경
-            val maxRadius = 220.0 // 화면 내에 표시되는 최대 반경
+        // 2. 레이더 궤도 그리기
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val maxRadius = radarSize.toPx() / 2
             
-            // 거리에 따라 반경 계산 (최소값 보장)
-            val distanceRatio = person.distance / 500.0 // 거리 비율 조정
-            val radius = minRadius + (maxRadius - minRadius) * distanceRatio.coerceIn(0.0, 1.0)
+            // 궤도 개수는 현재 displayDepthLevel에 따라 결정
+            val orbitCount = displayDepthLevel
+            
+            // 각 궤도 그리기
+            for (i in 1..orbitCount) {
+                val orbitRadius = maxRadius * (i.toFloat() / orbitCount)
+                
+                // 궤도 선
+                drawCircle(
+                    color = RadarLineColor.copy(alpha = 0.15f),
+                    radius = orbitRadius,
+                    center = center,
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
+            
+            // 레이더 스캔선 그리기 (animationValues.radarAngle 사용)
+            val angle = Math.toRadians(animationValues.radarAngle.toDouble())
+            val scanLineEndX = center.x + cos(angle).toFloat() * maxRadius
+            val scanLineEndY = center.y + sin(angle).toFloat() * maxRadius
+            
+            drawLine(
+                start = center,
+                end = Offset(scanLineEndX, scanLineEndY),
+                color = RadarLineColor.copy(alpha = 0.6f),
+                strokeWidth = 1.5.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+        
+        // 3. 주변 사람 점 표시
+        nearbyPeopleToDisplay.forEach { person ->
+            // 디버그 로그 추가
+            Log.d("MainContent", "PersonDot 렌더링: id=${person.serverUserIdString}, 닉네임=${person.nickname}, depth=${person.calculatedVisualDepth}, signalLevel=${person.signalLevel}")
+            
+            // 원형 레이더에서의 위치 계산 - 수정된 로직
+            val depthRatio = person.calculatedVisualDepth.toFloat() / displayDepthLevel.coerceAtLeast(1)
+            // 반지름 계산 수정 (최대 레이더 반지름의 비율로 계산)
+            val radius = (radarSize.value / 2) * depthRatio.coerceIn(0.1f, 0.95f)
             
             val angleInRadians = Math.toRadians(person.angle.toDouble())
-            val x = radius * cos(angleInRadians)
-            val y = radius * sin(angleInRadians)
+            val x = radius * cos(angleInRadians).toFloat()
+            val y = radius * sin(angleInRadians).toFloat()
+            
+            // 로그 추가: 계산된 위치 정보
+            Log.d("MainContent", "도트 위치 계산: depthRatio=$depthRatio, radius=$radius, x=$x, y=$y")
             
             Box(
                 modifier = Modifier
                     .offset(x = x.dp, y = y.dp)
-                    .size(50.dp), // 클릭 가능한 영역 확보 (크기 고정)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onPersonClick(person.serverUserIdString) }
+                    .size(50.dp),
                 contentAlignment = Alignment.Center
             ) {
-                LanternDot(
-                    modifier = Modifier,
-                    signalStrength = person.signalStrength,
+                PersonDot(
+                    signalLevel = person.signalLevel,
+                    depth = person.calculatedVisualDepth,
                     pulseScale = animationValues.dotPulseScale,
-                    glowAlpha = animationValues.dotGlowAlpha,
-                    distance = person.distance
+                    glowAlpha = animationValues.dotGlowAlpha
                 )
             }
         }
         
-        // 중앙 요소를 배치하는 Box를 추가하여 정확한 중앙 정렬 보장
+        // 4. 중앙 스캔 버튼
         Box(
-            modifier = Modifier
-                .fillMaxSize(),
+            modifier = Modifier.align(Alignment.Center),
             contentAlignment = Alignment.Center
         ) {
-            // 중앙 스캔 버튼
+            // 외부 글로우 효과
             Box(
                 modifier = Modifier
-                    .offset(x = 0.dp, y = 0.dp), // 정확히 중앙에 위치하도록 offset 추가
-                contentAlignment = Alignment.Center
-            ) {
-                // Radar Glow (outer glow) - 아우터 글로우를 먼저 그려서 버튼 아래에 위치하도록 함
-                Box(
-                    modifier = Modifier
-                        .size(200.dp)
-                        .scale(animationValues.buttonScale)
-                        .alpha(animationValues.buttonGlowAlpha * 0.6f)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(DeepOrange.copy(alpha = 0.3f), Color.Transparent),
-                                radius = 200f * 0.75f
-                            )
+                    .size(200.dp)
+                    .scale(animationValues.buttonScale)
+                    .alpha(animationValues.buttonGlowAlpha * 0.6f)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(DeepOrange.copy(alpha = 0.3f), Color.Transparent),
+                            radius = 200f * 0.75f
                         )
-                )
-                
-                // 중앙 레이더 버튼
-                LanternCenterButton(
-                    buttonScale = animationValues.buttonScale,
-                    buttonGlowAlpha = animationValues.buttonGlowAlpha,
-                    radarAngle = animationValues.radarAngle
-                )
-            }
-        }
-        
-        // 하단 정보 영역
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 0.dp),  // 패딩 제거
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)  // 간격을 16dp에서 8dp로 줄임
-        ) {
+                    )
+            )
             
-            AnimatedVisibility(
-                visible = subTextVisible,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-
-            }
-            // 목록 보기 버튼
-            GradientButton(
-                text = "주변 사람 목록 보기",
-                onClick = {
-                    if (nearbyPeople.isNotEmpty()) {
-                        onShowListToggle()
-                    }
-                    // else 블록은 아무 일도 하지 않음
-                }
+            // 중앙 버튼
+            LanternCenterButton(
+                buttonScale = animationValues.buttonScale,
+                buttonGlowAlpha = animationValues.buttonGlowAlpha,
+                radarAngle = animationValues.radarAngle,
+                buttonText = buttonText,
+                subTextVisible = subTextVisible,
+                onScanToggle = {}
             )
         }
         
-        // 사람 목록 모달 - AnimatedVisibility로 감싸서 수정
-        AnimatedVisibility(
-            visible = showPersonListModal,
-            enter = fadeIn(),
-            exit = fadeOut()
+        // 5. 상단 랜턴 개수 및 내 Depth 표시
+        Column(
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            NearbyLanternCount(count = nearbyPeopleToDisplay.size, selfDepth = currentSelfDepth)
+        }
+        
+        // 6. 하단 UI (목록 보기 버튼)
+        Column(
+            modifier = Modifier.align(Alignment.BottomCenter)
+                .padding(bottom = 16.dp)
+                .navigationBarsPadding()
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 항상 보이는 '주변 목록 보기' 버튼 (AnimatedVisibility 제거)
+            GradientButton(
+                text = "주변 목록 보기",
+                onClick = onShowListToggle
+            )
+        }
+        
+        // 7. 사람 목록 모달
+        if (showPersonListModal) {
             NearbyPersonListModal(
-                people = nearbyPeople,
-                onDismiss = onShowListToggle,
+                people = nearbyPeopleToDisplay,
+                onDismiss = onDismissModal,
                 onPersonClick = onPersonClick,
                 onCallClick = onCallClick
             )
+        }
+
+        // 디버그용 블루투스 상태 확인 버튼 추가 (레이더 위에 배치)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            TextButton(
+                onClick = onCheckBluetoothState,
+                modifier = Modifier.padding(top = 8.dp, end = 8.dp)
+            ) {
+                Text("BLE 상태 확인", color = Color.White, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -251,36 +295,30 @@ fun MainContent(
  * 주변 랜턴 개수를 표시하는 컴포넌트
  */
 @Composable
-fun NearbyLanternCount(count: Int) {
+fun NearbyLanternCount(count: Int, selfDepth: Int) {
     Row(
         modifier = Modifier
-            .background(
-                color = MainScreenCardBg.copy(alpha = 0.8f), // 배경 투명도 증가
-                shape = CircleShape
-            )
-            .padding(horizontal = 20.dp, vertical = 12.dp), // 패딩 증가
-        verticalAlignment = Alignment.CenterVertically
+            .background(MainScreenCardBg.copy(alpha = 0.8f), CircleShape)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "주변에 ",
+            text = "주변 랜턴: $count",
             color = TextWhite,
-            style = MaterialTheme.typography.titleMedium, // 스타일 변경
-            fontSize = 18.sp, // 폰트 크기 증가
-            fontWeight = FontWeight.Medium // 중간 두께 폰트
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium
         )
         Text(
-            text = count.toString(),
-            color = LanternYellow,
-            style = MaterialTheme.typography.titleMedium, // 스타일 변경
-            fontSize = 20.sp, // 더 큰 폰트 크기
-            fontWeight = FontWeight.Bold // 굵은 폰트 유지
+            text = "·",
+            color = TextWhite,
+            fontSize = 16.sp
         )
         Text(
-            text = "명의 랜턴이 있습니다",
+            text = "내 홉수: $selfDepth",
             color = TextWhite,
-            style = MaterialTheme.typography.titleMedium, // 스타일 변경
-            fontSize = 18.sp, // 폰트 크기 증가
-            fontWeight = FontWeight.Medium // 중간 두께 폰트
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium
         )
     }
 }
@@ -292,7 +330,10 @@ fun NearbyLanternCount(count: Int) {
 fun LanternCenterButton(
     buttonScale: Float,
     buttonGlowAlpha: Float,
-    radarAngle: Float
+    radarAngle: Float,
+    buttonText: String,
+    subTextVisible: Boolean,
+    onScanToggle: () -> Unit
 ) {
     val baseColor = LanternYellow
     val darkColor = LanternYellowDark
@@ -463,85 +504,57 @@ fun RippleCircle(
  * 랜턴 형태의 점 (기존 PersonDot 대체)
  */
 @Composable
-fun LanternDot(
-    modifier: Modifier = Modifier,
-    signalStrength: Float = 1f,
-    pulseScale: Float = 1f,
-    glowAlpha: Float = 0.5f,
-    distance: Float = 0f
+fun PersonDot(
+    signalLevel: Int,
+    depth: Float,
+    pulseScale: Float,
+    glowAlpha: Float
 ) {
-    val connectionColor = getConnectionColorByDistance(distance)
+    val connectionColor = getConnectionColorBySignalLevel(signalLevel)
     val lanternYellow = Color(0xFFFFC107) // 랜턴 노란색
     
-    Box(modifier = modifier) {
-        // 첫 번째 Box (기본 랜턴)
+    Box(
+        modifier = Modifier
+            .size(14.dp) // 기본 크기 유지
+            .scale(pulseScale)
+            .shadow(
+                elevation = 8.dp,
+                spotColor = lanternYellow,
+                shape = CircleShape
+            )
+            .clip(CircleShape)
+            .background(lanternYellow) // 노란색 랜턴 색상으로 변경
+    ) {
+        // 내부 빛 효과
         Box(
             modifier = Modifier
-                .size(14.dp) // 기본 크기 유지
-                .scale(pulseScale)
-                .shadow(
-                    elevation = 8.dp,
-                    spotColor = lanternYellow,
-                    shape = CircleShape
-                )
-                .clip(CircleShape)
-                .background(lanternYellow) // 노란색 랜턴 색상으로 변경
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = { /* 점을 클릭했을 때 이벤트 처리 - 나중에 구현 */ }
-                )
-        ) {
-            // 내부 빛 효과
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .alpha(glowAlpha)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White,
-                                lanternYellow.copy(alpha = 0.7f)
-                            )
+                .fillMaxSize()
+                .alpha(glowAlpha)
+                .background(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White,
+                            lanternYellow.copy(alpha = 0.7f)
                         )
                     )
-            )
-            
-            // 빛 테두리 효과
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawBehind {
-                        // 빛이 퍼지는 효과를 위한 외부 원
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    lanternYellow.copy(alpha = 0.6f),
-                                    lanternYellow.copy(alpha = 0.0f)
-                                ),
-                                radius = size.width * 1.2f
-                            ),
-                            radius = size.width * 1.2f
-                        )
-                    }
-            )
-        }
+                )
+        )
         
-        // 두 번째 Box (확장된 빛 효과) - @Composable 컨텍스트 내에서 호출
+        // 빛 테두리 효과
         Box(
             modifier = Modifier
-                .size(24.dp)
-                .scale(pulseScale)
-                .alpha(glowAlpha * 0.6f)
+                .fillMaxSize()
                 .drawBehind {
+                    // 빛이 퍼지는 효과를 위한 외부 원
                     drawCircle(
                         brush = Brush.radialGradient(
                             colors = listOf(
-                                lanternYellow.copy(alpha = 0.3f),
+                                lanternYellow.copy(alpha = 0.6f),
                                 lanternYellow.copy(alpha = 0.0f)
-                            )
+                            ),
+                            radius = size.width * 1.2f
                         ),
-                        radius = size.width
+                        radius = size.width * 1.2f
                     )
                 }
         )
