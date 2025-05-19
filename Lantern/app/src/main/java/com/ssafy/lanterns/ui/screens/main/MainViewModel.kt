@@ -15,19 +15,23 @@ import com.ssafy.lanterns.config.BleConstants
 import com.ssafy.lanterns.config.NeighborDiscoveryConstants
 import com.ssafy.lanterns.data.model.User
 import com.ssafy.lanterns.data.repository.UserRepository
+import com.ssafy.lanterns.di.EmergencyEventTrigger
 import com.ssafy.lanterns.service.ble.advertiser.NeighborAdvertiser
 import com.ssafy.lanterns.service.ble.scanner.NeighborScanner
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
 import com.ssafy.lanterns.utils.SignalStrengthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import kotlin.math.abs
 import java.lang.ref.WeakReference
+
 
 data class MainScreenUiState(
     val isScanningActive: Boolean = false,
@@ -43,14 +47,22 @@ data class MainScreenUiState(
     val isLoading: Boolean = true, // 초기 사용자 정보 로드 시 true
     val currentSelfAdvertisedDepth: Int = 0, // UI에 표시 및 광고에 사용될 내 현재 Depth
     val subTextVisible: Boolean = true,
-    val showListButton: Boolean = false
+    val showListButton: Boolean = false,
+    val showEmergencyAlert: Boolean = false,
+    val emergencyAlertNickname: String? = null,
+    val isEmergencyVisualEffectActive: Boolean = false, // 화면 깜빡임 및 진동 제어용
+    val currentEmergencyPacketTimestamp: Long = 0L, // 중복 알림 방지용 (선택 사항)
+    val rescueRequestReceived: Boolean = false, // 구조 요청 수신 여부
+    val rescueRequesterNickname: String? = null, // 구조 요청자 닉네임
+
 )
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    @EmergencyEventTrigger private val emergencyEventTriggerFlow: SharedFlow<Unit>
 ) : ViewModel() {
-    companion object { private const val TAG = "MainVM_CyclicFix" }
+    companion object { private const val TAG = "MainVM_Emergency" }
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
@@ -65,8 +77,30 @@ class MainViewModel @Inject constructor(
     @Volatile private var myCurrentAdvertisedDepth: Int = 0 // 항상 0으로 초기화
 
     private val bleHandler = Handler(Looper.getMainLooper())
-    private val advertiseRunnable: Runnable = Runnable { startOrUpdateAdvertising() }
+    private val advertiseRunnable: Runnable = Runnable { startOrUpdateAdvertising(isEmergency = 0.toByte()) }
     private var activityRef: WeakReference<Activity>? = null
+
+
+    init {
+        Log.d(TAG, "MainViewModel init 시작")
+        observeEmergencyEvents()
+    }
+
+    private var lastEmergencyEventTime = 0L
+    private fun observeEmergencyEvents() {
+        viewModelScope.launch {
+            emergencyEventTriggerFlow.collect {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastEmergencyEventTime > 1000) { // 예: 1초 이내 중복 이벤트 무시
+                    lastEmergencyEventTime = currentTime
+                    Log.d(TAG, "!!! MainViewModel에서 긴급 이벤트 수신됨 !!! triggerEmergencyBroadcast() 호출 예정.")
+                    triggerEmergencyBroadcast()
+                } else {
+                    Log.d(TAG, "MainViewModel에서 짧은 시간 내 중복 긴급 이벤트 수신 무시됨.")
+                }
+            }
+        }
+    }
 
     fun initialize(activity: Activity) {
         activityRef = WeakReference(activity)
@@ -177,13 +211,15 @@ class MainViewModel @Inject constructor(
         activityRef?.get()?.let {
             NeighborAdvertiser.init(it)
             NeighborScanner.init(it)
+            NeighborScanner.setMyNickname(myNickname)
+            NeighborScanner.setMyServerId(myServerUserId)
         } ?: run { Log.e(TAG, "Activity Context null, BLE 초기화 불가"); return }
 
         Log.i(TAG, "BLE 작업 시작 요청됨")
         // _uiState.update { it.copy(buttonText = "탐색 중...", showListButton = _uiState.value.nearbyPeople.isNotEmpty()) } // 토글에서 이미 처리
 
         NeighborScanner.startScanning()
-        startOrUpdateAdvertising() // 즉시 광고 및 주기적 업데이트 예약
+        startOrUpdateAdvertising(isEmergency = 0.toByte()) // 즉시 광고 및 주기적 업데이트 예약
 
         bleOperationJob?.cancel()
         bleOperationJob = viewModelScope.launch {
@@ -230,13 +266,64 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun startOrUpdateAdvertising() {
+    private fun startOrUpdateAdvertising(isEmergency: Byte = 0.toByte()) {
         if (myServerUserId == -1L || !_uiState.value.isBleReady) return
 
-        NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth)
-        bleHandler.removeCallbacks(advertiseRunnable)
-        bleHandler.postDelayed(advertiseRunnable, NeighborDiscoveryConstants.ADVERTISE_INTERVAL_MS)
+        NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency)
+        if (isEmergency == 0.toByte()) {
+            bleHandler.removeCallbacks(advertiseRunnable) // 이전 예약이 있다면 취소
+            bleHandler.postDelayed(advertiseRunnable, NeighborDiscoveryConstants.ADVERTISE_INTERVAL_MS)
+        }
     }
+
+
+
+    // MainViewModel.kt
+    // MainViewModel.kt
+    fun triggerEmergencyBroadcast() {
+        Log.d(TAG, ">>> MainViewModel.triggerEmergencyBroadcast() 함수 요청됨 <<<") // 요청 시점 로그
+        viewModelScope.launch { // 함수 전체를 launch 블록으로 감싼다
+            Log.d(TAG, "triggerEmergencyBroadcast 코루틴 시작")
+            var attempts = 0
+            // isBleReady와 myServerUserId가 준비될 때까지 대기 (최대 3초)
+            while ((!_uiState.value.isBleReady || myServerUserId == -1L) && attempts < 30) {
+                Log.w(TAG, "triggerEmergencyBroadcast 대기 중: isBleReady=${_uiState.value.isBleReady}, myServerUserId=$myServerUserId (시도: $attempts)")
+                delay(100)
+                attempts++
+            }
+
+            if (myServerUserId == -1L || !_uiState.value.isBleReady) {
+                Log.e(TAG, "긴급 광고 시작 불가 (최종 확인): 서버 ID ($myServerUserId) 또는 BLE 준비 안됨 (isBleReady=${_uiState.value.isBleReady})")
+                _uiState.update { it.copy(errorMessage = "긴급 호출을 전송할 수 없습니다. 초기화가 완료되지 않았거나 BLE 상태를 확인해주세요.") }
+                return@launch // 코루틴 종료
+            }
+
+            Log.i(TAG, "긴급 광고 요청됨 (MainViewModel 내부 - 최종): 사용자 ID=$myServerUserId, 닉네임='$myPreparedNicknameForAdv', Depth=$myCurrentAdvertisedDepth")
+
+            // 핸들러 작업도 코루틴 내에서 안전하게 처리 (또는 withContext(Dispatchers.Main) 사용)
+            withContext(Dispatchers.Main) { // bleHandler 작업은 메인 스레드에서
+                bleHandler.removeCallbacks(advertiseRunnable)
+            }
+
+            Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 직전 (Emergency=1)")
+            NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency = 1.toByte())
+            Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 완료 (Emergency=1)")
+
+            // 5초 후 일반 광고로 복귀 (이 launch는 이미 부모 launch 내에 있으므로 중첩 launch)
+            launch {
+                delay(5000L)
+                if (_uiState.value.isScanningActive && _uiState.value.isBleReady) {
+                    Log.d(TAG, "긴급 광고 시간 종료, 일반 광고로 복귀 시도 (MainViewModel)")
+                    startOrUpdateAdvertising(isEmergency = 0.toByte())
+                } else {
+                    Log.d(TAG, "긴급 광고 시간 종료되었으나, 스캔이 비활성이거나 BLE가 준비되지 않아 일반 광고로 복귀 안 함.")
+                }
+            }
+        }
+    }
+
+
+
 
     private fun processScanResults() {
         if (myServerUserId == -1L) return
@@ -261,6 +348,44 @@ class MainViewModel @Inject constructor(
                 SignalStrengthManager.clearHistoryForDevice(bleAddress)
                 return@forEach
             }
+            // 긴급 플래그 확인 및 처리
+            if (scannedDevice.isEmergency == 1.toByte()) {
+                Log.i(TAG, "긴급 패킷 수신: Nick='${scannedDevice.nickname}', sID=${scannedDevice.serverUserId}, RSSI=${scannedDevice.rssi}")
+                // 거리 기반 필터링 (예: RSSI 임계값 사용)
+                // 실제 50m는 RSSI만으로 정확히 판단하기 어려우므로, 여기서는 예시로 강한 신호(-70 이상)일 때 알림
+                if (scannedDevice.rssi >= -70) { // 이 임계값은 테스트를 통해 조정 필요
+                    // 중복 알림 방지 로직 (currentEmergencyPacketTimestamp와 lastSeen 비교)
+                    // 또는 특정 시간 내 동일 ID 알림 무시 등
+                    if (_uiState.value.currentEmergencyPacketTimestamp != scannedDevice.lastSeen || _uiState.value.emergencyAlertNickname != scannedDevice.nickname) {
+                        _uiState.update {
+                            it.copy(
+                                showEmergencyAlert = true,
+                                emergencyAlertNickname = scannedDevice.nickname,
+                                isEmergencyVisualEffectActive = true,
+                                currentEmergencyPacketTimestamp = scannedDevice.lastSeen
+                            )
+                        }
+                        Log.d(TAG, "긴급 알림 UI 상태 업데이트: Nick='${scannedDevice.nickname}'")
+                        // 5초 후 긴급 시각 효과 자동 해제
+                        viewModelScope.launch {
+                            delay(5000L)
+                            // 타이머 만료 시, 현재 알림이 여전히 동일한 사용자의 것인지 확인 후 해제
+                            if (_uiState.value.showEmergencyAlert && _uiState.value.currentEmergencyPacketTimestamp == scannedDevice.lastSeen) {
+                                _uiState.update {
+                                    it.copy(isEmergencyVisualEffectActive = false)
+                                }
+                                Log.d(TAG, "5초 후 긴급 시각 효과 자동 해제: Nick='${scannedDevice.nickname}'")
+                            }
+                        }
+                    } else {
+                        Log.d(TAG, "중복 긴급 알림 무시: Nick='${scannedDevice.nickname}'")
+                    }
+                } else {
+                    Log.d(TAG, "수신된 긴급 패킷의 신호가 약함 (RSSI: ${scannedDevice.rssi}). 알림 표시 안 함.")
+                }
+            }
+
+
 
             // 계산된 시각적 홉수 = 상대방 광고 홉수 + 1
             val calculatedVisualDepth = scannedDevice.advertisedOwnDepth + 1
@@ -300,7 +425,7 @@ class MainViewModel @Inject constructor(
             updatedNearbyMap[serverUserIdStr] = newPerson
             
             // 각 디바이스 정보 로그 추가
-            Log.d(TAG, "주변 기기 정보: 닉네임=${newPerson.nickname}, 시각적 Depth=${calculatedVisualDepth}, 신호=${signalLevel}, RSSI=${smoothedRssi}")
+//            Log.d(TAG, "주변 기기 정보: 닉네임=${newPerson.nickname}, 시각적 Depth=${calculatedVisualDepth}, 신호=${signalLevel}, RSSI=${smoothedRssi}")
         }
 
         // 앵커 기기를 발견했거나 최단 경로가 현재 내 홉수보다 짧을 때만 홉수 업데이트
@@ -327,9 +452,9 @@ class MainViewModel @Inject constructor(
         )
         
         // 디버그 로그 추가
-        Log.d(TAG, "주변 기기 수: ${newNearbyList.size}, UI 표시 여부: ${_uiState.value.nearbyPeople != newNearbyList}")
+//        Log.d(TAG, "주변 기기 수: ${newNearbyList.size}, UI 표시 여부: ${_uiState.value.nearbyPeople != newNearbyList}")
         if (newNearbyList.isNotEmpty()) {
-            Log.d(TAG, "첫 번째 기기: 닉네임=${newNearbyList[0].nickname}, 홉수=${newNearbyList[0].calculatedVisualDepth}, RSSI=${newNearbyList[0].rssi}")
+//            Log.d(TAG, "첫 번째 기기: 닉네임=${newNearbyList[0].nickname}, 홉수=${newNearbyList[0].calculatedVisualDepth}, RSSI=${newNearbyList[0].rssi}")
         }
 
         // 항상 업데이트하도록 변경하여 UI 반영 문제 해결 (동등성 검사 제거)
@@ -339,11 +464,37 @@ class MainViewModel @Inject constructor(
         ) }
     }
 
+    fun dismissEmergencyAlert() {
+        _uiState.update {
+            it.copy(
+                showEmergencyAlert = false,
+                // emergencyAlertNickname = null, // 닉네임은 유지해도 되고, null로 바꿔도 됨 (UI 정책에 따라)
+                isEmergencyVisualEffectActive = false // 시각 효과는 확실히 중단
+            )
+        }
+        // 필요하다면 중복 알림 방지용 타임스탬프도 초기화
+        // _uiState.update { it.copy(currentEmergencyPacketTimestamp = 0L) }
+        Log.d(TAG, "긴급 알림 UI 해제됨.")
+    }
+
+
     fun togglePersonListModal() {
         _uiState.update { it.copy(showPersonListModal = !it.showPersonListModal) }
     }
 
-    fun onPersonClick(serverUserIdString: String) = _uiState.update { it.copy(navigateToProfileServerUserIdString = serverUserIdString) }
+    fun onPersonClick(serverUserIdString: String) {
+        val person = _uiState.value.nearbyPeople.find { it.serverUserIdString == serverUserIdString }
+        if (person != null) {
+            // 네비게이션을 위한 상태 업데이트
+            _uiState.update {
+                it.copy(
+                    navigateToProfileServerUserIdString = serverUserIdString
+                )
+            }
+        } else {
+            Log.w(TAG, "클릭된 사용자 ID($serverUserIdString)를 현재 목록에서 찾을 수 없습니다.")
+        }
+    }
     fun onProfileScreenNavigated() = _uiState.update { it.copy(navigateToProfileServerUserIdString = null) }
     fun setDisplayDepthLevel(level: Int) {
         _uiState.update { it.copy(displayDepthLevel = level.coerceIn(1, NeighborDiscoveryConstants.DISPLAY_DEPTH_LEVELS.lastOrNull() ?: NeighborDiscoveryConstants.MAX_TRACKABLE_DEPTH)) }
@@ -391,6 +542,7 @@ class MainViewModel @Inject constructor(
         stopBleOperationsInternal()
         NeighborScanner.release()
         NeighborAdvertiser.release()
+        activityRef?.clear()
         activityRef = null // WeakReference이므로 명시적 null 처리는 불필요할 수 있으나, 확실히 함
     }
 
@@ -425,6 +577,16 @@ class MainViewModel @Inject constructor(
         }
         
         updateBlePermissionStatus(blePermissionsGranted)
+    }
+
+    fun dismissRescueAlert() {
+        _uiState.update {
+            it.copy(
+                rescueRequestReceived = false,
+                rescueRequesterNickname = null
+            )
+        }
+        Log.d(TAG, "Rescue alert dismissed.")
     }
     
     /**

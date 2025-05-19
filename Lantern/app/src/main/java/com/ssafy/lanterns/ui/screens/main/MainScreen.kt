@@ -64,6 +64,12 @@ import android.util.Log
 import com.ssafy.lanterns.ui.navigation.AppDestinations
 import android.bluetooth.BluetoothManager
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import com.ssafy.lanterns.ui.screens.main.components.RescueAlertNotification
 
 /**
  * 메인 화면
@@ -337,7 +343,7 @@ fun MainScreen(
             MainContent(
                 isScanning = uiState.isScanningActive,
                 nearbyPeopleToDisplay = uiState.nearbyPeople.also { 
-                    Log.d("MainScreen", "전체 주변 사람 수: ${it.size}, 필터 적용될 수준: ${uiState.displayDepthLevel}, 표시될 것으로 예상: ${it.filter { p -> p.calculatedVisualDepth <= uiState.displayDepthLevel }.size}")
+                   // Log.d("MainScreen", "전체 주변 사람 수: ${it.size}, 필터 적용될 수준: ${uiState.displayDepthLevel}, 표시될 것으로 예상: ${it.filter { p -> p.calculatedVisualDepth <= uiState.displayDepthLevel }.size}")
                 }.filter { it.calculatedVisualDepth <= uiState.displayDepthLevel.coerceAtLeast(3) },
                 currentSelfDepth = uiState.currentSelfAdvertisedDepth,
                 displayDepthLevel = uiState.displayDepthLevel.coerceAtLeast(3),
@@ -367,6 +373,21 @@ fun MainScreen(
                 showListButton = uiState.showListButton,
                 onCheckBluetoothState = { onScanButtonClick() }
             )
+            AnimatedVisibility(
+                visible = uiState.rescueRequestReceived,
+                enter = fadeIn(animationSpec = tween(300)) + slideInVertically(animationSpec = tween(300)),
+                exit = fadeOut(animationSpec = tween(300)) + slideOutVertically(animationSpec = tween(300)),
+                modifier = Modifier.align(Alignment.TopCenter) // Box 내에서 TopCenter로 정렬
+            ) {
+                val message = uiState.rescueRequesterNickname?.let { nickname ->
+                    "주변에 구조요청을 원하는 사람(${nickname}님)이 있습니다."
+                } ?: "주변에 구조요청을 원하는 사람이 있습니다."
+
+                RescueAlertNotification(
+                    message = message,
+                    onDismiss = { viewModel.dismissRescueAlert() }
+                )
+            }
             
         }
     }
