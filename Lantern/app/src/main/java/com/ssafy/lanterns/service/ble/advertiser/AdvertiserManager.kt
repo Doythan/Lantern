@@ -2,10 +2,10 @@ package com.ssafy.lanterns.service.ble.advertiser
 
 import android.app.Activity
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.Manifest
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.BluetoothLeAdvertiser
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
@@ -63,7 +63,7 @@ object AdvertiserManager{
             val scBytes = scCombined.toByteArray()
 
             // 내 기기에서도 메시지 수신시 중복 방지를 위한 처리
-            ScannerManager.updateChatSet(uuid, adCombined + scCombined, activity)
+            ScannerManager.updateChatSet(uuid, activity)
 
             // 메시지 데이터 광고
             advertiseData = AdvertiseData.Builder()

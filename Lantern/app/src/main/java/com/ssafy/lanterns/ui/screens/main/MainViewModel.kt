@@ -1,191 +1,439 @@
 package com.ssafy.lanterns.ui.screens.main
 
+import android.Manifest
+import android.app.Activity
+import android.bluetooth.BluetoothManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ssafy.lanterns.config.BleConstants
+import com.ssafy.lanterns.config.NeighborDiscoveryConstants
+import com.ssafy.lanterns.data.model.User
+import com.ssafy.lanterns.data.repository.UserRepository
+import com.ssafy.lanterns.service.ble.advertiser.NeighborAdvertiser
+import com.ssafy.lanterns.service.ble.scanner.NeighborScanner
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
+import com.ssafy.lanterns.utils.SignalStrengthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.nio.charset.StandardCharsets
 import javax.inject.Inject
-import kotlin.random.Random
+import kotlin.math.abs
+import java.lang.ref.WeakReference
 
-/**
- * 메인 화면의 상태를 관리하는 ViewModel
- */
-data class MainScreenState(
-    val isScanning: Boolean = true,              // 항상 스캔 중
+data class MainScreenUiState(
+    val isScanningActive: Boolean = false,
     val nearbyPeople: List<NearbyPerson> = emptyList(),
     val showPersonListModal: Boolean = false,
-    val buttonText: String = "탐색 중...",        // 항상 "탐색 중..."
-    val subTextVisible: Boolean = true,          // 항상 표시
-    val showListButton: Boolean = false,
-
-    // BLE 상태
-    val isBleServiceActive: Boolean = true,      // 항상 활성화
-
-    // 프로필 이동용 userId
-    val navigateToProfile: String? = null
+    val buttonText: String = "탐색 시작",
+    val blePermissionsGranted: Boolean = false,
+    val isBluetoothEnabled: Boolean = false,
+    val isBleReady: Boolean = false,
+    val navigateToProfileServerUserIdString: String? = null,
+    val displayDepthLevel: Int = NeighborDiscoveryConstants.MAX_DISPLAY_DEPTH_INITIAL,
+    val errorMessage: String? = null,
+    val isLoading: Boolean = true, // 초기 사용자 정보 로드 시 true
+    val currentSelfAdvertisedDepth: Int = 0, // UI에 표시 및 광고에 사용될 내 현재 Depth
+    val subTextVisible: Boolean = true,
+    val showListButton: Boolean = false
 )
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    // TODO: BLE 의존성 주입
+    private val userRepository: UserRepository
 ) : ViewModel() {
+    companion object { private const val TAG = "MainVM_CyclicFix" }
+    private val _uiState = MutableStateFlow(MainScreenUiState())
+    val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
-    /* -------------------------------------------------- *
-     * constants
-     * -------------------------------------------------- */
-    companion object {
-        private const val TAG = "MainViewModel"
-        private const val AI_ACTIVATION_DEBOUNCE_MS = 2_000L
-    }
-
-    /* -------------------------------------------------- *
-     * UI 상태
-     * -------------------------------------------------- */
-    private val _uiState = MutableStateFlow(MainScreenState())
-    val uiState: StateFlow<MainScreenState> = _uiState.asStateFlow()
-
-    /* -------------------------------------------------- *
-     * AI 다이얼로그 상태
-     * -------------------------------------------------- */
     private val _aiActive = MutableStateFlow(false)
     val aiActive: StateFlow<Boolean> = _aiActive.asStateFlow()
-
     private var lastAiActivationTime = 0L
 
-    /* -------------------------------------------------- *
-     * BLE 스캔 job
-     * -------------------------------------------------- */
-    private var scanningJob: Job? = null
+    private var bleOperationJob: Job? = null
+    private var myServerUserId: Long = -1L
+    private var myNickname: String = "랜턴" // 기본값
+    private var myPreparedNicknameForAdv: String = "랜턴" // 광고용으로 준비된 닉네임
+    @Volatile private var myCurrentAdvertisedDepth: Int = 0 // 항상 0으로 초기화
 
-    /* -------------------------------------------------- *
-     * init
-     * -------------------------------------------------- */
-    init {
-        // ViewModel 생성 시 자동 스캔 시작
-        startScanning()
+    private val bleHandler = Handler(Looper.getMainLooper())
+    private val advertiseRunnable: Runnable = Runnable { startOrUpdateAdvertising() }
+    private var activityRef: WeakReference<Activity>? = null
+
+    fun initialize(activity: Activity) {
+        activityRef = WeakReference(activity)
+        Log.i(TAG, "ViewModel 초기화 시작")
+        updateBluetoothStateAndPermissions(activity) // 최초 상태 확인
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val currentUser: User? = userRepository.getCurrentUser()
+            if (currentUser != null && currentUser.userId != 0L) {
+                myServerUserId = currentUser.userId
+                myNickname = currentUser.nickname.ifBlank { "랜턴_${currentUser.userId.toString().takeLast(3)}" }
+                myPreparedNicknameForAdv = truncateNicknameForAdv(myNickname)
+                Log.i(TAG, "사용자 정보 로드: sID=$myServerUserId, Nick='$myNickname', MyAdvDepth=$myCurrentAdvertisedDepth")
+                _uiState.update { it.copy(currentSelfAdvertisedDepth = myCurrentAdvertisedDepth, isLoading = false) }
+            } else {
+                _uiState.update { it.copy(errorMessage = "로그인 정보가 유효하지 않습니다. 탐색을 시작할 수 없습니다.", isLoading = false) }
+                Log.w(TAG, "유효한 사용자 정보 없음. currentUser: $currentUser")
+                myServerUserId = -1L
+            }
+            checkBleReadyState() // 사용자 정보 로드 후 최종 BLE 준비 상태 확인
+        }
     }
 
-    /* ==================================================
-     *  AI 다이얼로그 제어
-     * ================================================== */
+    private fun truncateNicknameForAdv(nickname: String): String {
+        val nicknameBytes = nickname.toByteArray(StandardCharsets.UTF_8)
+        if (nicknameBytes.size <= BleConstants.MAX_NICKNAME_BYTES_ADV) return nickname
+        var takenBytes = 0; var endIndex = 0
+        for (i in nickname.indices) {
+            val charAsStr = nickname.substring(i, i + 1)
+            val charBytesSize = charAsStr.toByteArray(StandardCharsets.UTF_8).size
+            if (takenBytes + charBytesSize <= BleConstants.MAX_NICKNAME_BYTES_ADV) {
+                takenBytes += charBytesSize; endIndex = i + 1
+            } else break
+        }
+        return nickname.substring(0, endIndex)
+    }
 
-    /** "헤이 랜턴" 감지 시 호출 */
+    fun updateBlePermissionStatus(granted: Boolean) {
+        Log.d(TAG, "BLE 권한 상태 업데이트: $granted")
+        val newState = _uiState.value.copy(blePermissionsGranted = granted)
+        _uiState.value = newState // 직접 할당하여 즉시 반영
+        checkBleReadyState()
+    }
+
+    fun updateBluetoothState(enabled: Boolean) {
+        Log.d(TAG, "블루투스 활성화 상태 업데이트: $enabled")
+        val newState = _uiState.value.copy(isBluetoothEnabled = enabled)
+        _uiState.value = newState // 직접 할당
+        checkBleReadyState()
+    }
+
+    // BLE 준비 상태만 확인하고 isBleReady 상태를 업데이트합니다.
+    private fun checkBleReadyState() {
+        val currentState = _uiState.value
+        val isReady = currentState.blePermissionsGranted && currentState.isBluetoothEnabled && myServerUserId != -1L
+        Log.d(TAG, "BLE 준비 상태 확인: isReady=$isReady (권한=${currentState.blePermissionsGranted}, BT=${currentState.isBluetoothEnabled}, 로그인=${myServerUserId != -1L})")
+
+        if (currentState.isBleReady != isReady) {
+             _uiState.update { it.copy(isBleReady = isReady) }
+        }
+
+        // 준비 상태가 아니라면 에러 메시지 설정
+        if (!isReady) {
+            val errorMsg = when {
+                myServerUserId == -1L -> _uiState.value.errorMessage ?: "로그인 정보가 필요합니다."
+                !currentState.blePermissionsGranted -> "탐색을 위해 BLE 권한이 필요합니다."
+                !currentState.isBluetoothEnabled -> "탐색을 위해 블루투스를 켜주세요."
+                else -> null
+            }
+            if (_uiState.value.errorMessage != errorMsg) {
+                _uiState.update { it.copy(errorMessage = errorMsg) }
+            }
+            if (_uiState.value.isScanningActive) { // 준비 안되면 스캔 중지
+                stopBleOperationsInternal()
+                _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작", nearbyPeople = emptyList(), showListButton = false) }
+            }
+        } else {
+            // BLE가 준비되면 오류 메시지 초기화 (만약 있었다면)
+            if (_uiState.value.errorMessage != null) {
+                _uiState.update { it.copy(errorMessage = null)}
+            }
+        }
+    }
+
+    fun toggleScan() {
+        val currentState = _uiState.value
+        Log.d(TAG, "toggleScan 호출됨. 현재 스캔 상태: ${currentState.isScanningActive}, BLE 준비 상태: ${currentState.isBleReady}")
+        if (currentState.isScanningActive) {
+            stopBleOperationsInternal()
+            _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작", nearbyPeople = emptyList(), showListButton = false) }
+        } else {
+            if (currentState.isBleReady) {
+                _uiState.update { it.copy(isScanningActive = true, buttonText = "탐색 중...", errorMessage = null) }
+                startBleOperationsInternal()
+            } else {
+                Log.w(TAG, "BLE 준비 안됨, 스캔 시작 불가. (권한=${currentState.blePermissionsGranted}, BT=${currentState.isBluetoothEnabled}, 로그인=${myServerUserId != -1L})")
+                // 사용자가 명시적으로 스캔을 시도했으므로, 상태 재확인 및 필요시 권한/설정 안내
+                activityRef?.get()?.let { updateBluetoothStateAndPermissions(it) } ?: checkBleReadyState() // Activity 없으면 상태만 재확인
+            }
+        }
+    }
+
+    private fun startBleOperationsInternal() {
+        if (myServerUserId == -1L) { Log.w(TAG, "서버 ID 없어 BLE 작업 시작 불가"); return }
+        if (!_uiState.value.isBleReady) { Log.w(TAG, "BLE 준비 안되어 작업 시작 불가"); return}
+
+        activityRef?.get()?.let {
+            NeighborAdvertiser.init(it)
+            NeighborScanner.init(it)
+        } ?: run { Log.e(TAG, "Activity Context null, BLE 초기화 불가"); return }
+
+        Log.i(TAG, "BLE 작업 시작 요청됨")
+        // _uiState.update { it.copy(buttonText = "탐색 중...", showListButton = _uiState.value.nearbyPeople.isNotEmpty()) } // 토글에서 이미 처리
+
+        NeighborScanner.startScanning()
+        startOrUpdateAdvertising() // 즉시 광고 및 주기적 업데이트 예약
+
+        bleOperationJob?.cancel()
+        bleOperationJob = viewModelScope.launch {
+            Log.d(TAG, "BLE 스캔 결과 처리 코루틴 시작, 갱신 주기: ${NeighborDiscoveryConstants.BLE_SCAN_INTERVAL_MS}ms")
+            while (_uiState.value.isScanningActive) {
+                processScanResults()
+                delay(NeighborDiscoveryConstants.BLE_SCAN_INTERVAL_MS)
+            }
+        }
+    }
+
+    private fun stopBleOperationsInternal() {
+        Log.i(TAG, "BLE 작업 중지 요청됨")
+        bleOperationJob?.cancel()
+        bleHandler.removeCallbacks(advertiseRunnable)
+        NeighborScanner.stopScanning()
+        NeighborAdvertiser.stopAdvertising()
+    }
+
+    fun onScreenResumed() {
+        Log.d(TAG, "화면 재개: 현재 스캔 상태: ${_uiState.value.isScanningActive}, BLE 준비 상태: ${_uiState.value.isBleReady}")
+        activityRef?.get()?.let {
+            updateBluetoothStateAndPermissions(it) // 화면 재개 시 항상 최신 상태로 업데이트
+        } ?: Log.w(TAG, "Activity 참조가 없어 화면 재개 시 상태 업데이트 못함")
+        
+        // isBleReady 상태는 updateBluetoothStateAndPermissions -> checkBleReadyState 를 통해 업데이트됨
+        // isScanningActive 상태는 이전 상태를 유지하려고 시도
+        if (_uiState.value.isScanningActive && _uiState.value.isBleReady) {
+            Log.i(TAG, "화면 재개: BLE 준비 및 이전 스캔 활성 상태이므로 스캔 재시작")
+            startBleOperationsInternal()
+        } else if (_uiState.value.isScanningActive && !_uiState.value.isBleReady){
+             Log.w(TAG, "화면 재개: 스캔은 활성이었으나 BLE 준비 안됨. 스캔 시작 안함.")
+             // 사용자가 다시 스캔 버튼을 누르도록 유도하거나, 에러 메시지를 통해 상태 알림
+             _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작") }
+        }
+    }
+
+    fun onScreenPaused() {
+        Log.d(TAG, "화면 일시정지: BLE 작업 중지")
+        // 스캔 중지하되 isScanningActive 상태는 유지하지 않음 (다시 켤 때 사용자가 명시적으로 켜도록)
+        if(_uiState.value.isScanningActive){
+            stopBleOperationsInternal()
+             _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작") }
+        }
+    }
+
+    private fun startOrUpdateAdvertising() {
+        if (myServerUserId == -1L || !_uiState.value.isBleReady) return
+
+        NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth)
+        bleHandler.removeCallbacks(advertiseRunnable)
+        bleHandler.postDelayed(advertiseRunnable, NeighborDiscoveryConstants.ADVERTISE_INTERVAL_MS)
+    }
+
+    private fun processScanResults() {
+        if (myServerUserId == -1L) return
+
+        val currentTime = System.currentTimeMillis()
+        val updatedNearbyMap = mutableMapOf<String, NearbyPerson>()
+        val currentScannedDevices = NeighborScanner.scannedDevicesMap.toMap()
+        Log.d(TAG, "현재 스캔된 디바이스 수: ${currentScannedDevices.size}")
+
+        // 내 홉수 계산을 위한 변수
+        var foundAnchorDevice = false
+        var shortestPathToRootViaNeighbor = -1
+
+        currentScannedDevices.forEach { (bleAddress, scannedDevice) ->
+            // 자신의 기기는 무시
+            if (scannedDevice.serverUserId == myServerUserId) return@forEach
+            
+            // 시간 초과된 기기 제거 - NeighborScanner와 동일한 시간 사용
+            if (currentTime - scannedDevice.lastSeen > NeighborScanner.DEVICE_EXPIRATION_MS) {
+                Log.d(TAG, "기기 시간 초과 (UI): '${scannedDevice.nickname}'(${scannedDevice.serverUserId}), 마지막 발견: ${(currentTime - scannedDevice.lastSeen) / 1000}초 전")
+                NeighborScanner.scannedDevicesMap.remove(bleAddress)
+                SignalStrengthManager.clearHistoryForDevice(bleAddress)
+                return@forEach
+            }
+
+            // 계산된 시각적 홉수 = 상대방 광고 홉수 + 1
+            val calculatedVisualDepth = scannedDevice.advertisedOwnDepth + 1
+            val advertisedDeviceDepth = scannedDevice.advertisedOwnDepth
+
+            // 앵커 기기 발견 (0인 기기를 발견)
+            if (advertisedDeviceDepth == 0) {
+                foundAnchorDevice = true
+                // 앵커 기기와 1홉 거리
+                shortestPathToRootViaNeighbor = 1
+            } 
+            // 다른 계산 로직은 그대로 유지
+            else if (calculatedVisualDepth < NeighborDiscoveryConstants.MAX_TRACKABLE_DEPTH) {
+                if (shortestPathToRootViaNeighbor == -1 || calculatedVisualDepth < shortestPathToRootViaNeighbor) {
+                    shortestPathToRootViaNeighbor = calculatedVisualDepth
+                }
+            }
+
+            val smoothedRssi = SignalStrengthManager.getSmoothedRssi(bleAddress, scannedDevice.rssi)
+            val signalLevel = when {
+                smoothedRssi >= -60 -> 3
+                smoothedRssi >= -75 -> 2
+                else -> 1
+            }
+
+            val serverUserIdStr = scannedDevice.serverUserId.toString()
+            val newPerson = NearbyPerson(
+                serverUserIdString = serverUserIdStr,
+                nickname = scannedDevice.nickname.ifBlank { "익명_${serverUserIdStr.takeLast(4)}" },
+                calculatedVisualDepth = calculatedVisualDepth,
+                advertisedDeviceDepth = advertisedDeviceDepth,
+                rssi = smoothedRssi,
+                signalLevel = signalLevel,
+                angle = (abs(scannedDevice.serverUserId.hashCode()) % 360).toFloat(),
+                lastSeenTimestamp = scannedDevice.lastSeen
+            )
+            updatedNearbyMap[serverUserIdStr] = newPerson
+            
+            // 각 디바이스 정보 로그 추가
+            Log.d(TAG, "주변 기기 정보: 닉네임=${newPerson.nickname}, 시각적 Depth=${calculatedVisualDepth}, 신호=${signalLevel}, RSSI=${smoothedRssi}")
+        }
+
+        // 앵커 기기를 발견했거나 최단 경로가 현재 내 홉수보다 짧을 때만 홉수 업데이트
+        if (foundAnchorDevice || (shortestPathToRootViaNeighbor != -1 && shortestPathToRootViaNeighbor < myCurrentAdvertisedDepth)) {
+            // 현재 내 홉수와 다를 때만 업데이트
+            if (myCurrentAdvertisedDepth != shortestPathToRootViaNeighbor) {
+                Log.i(TAG, "내 광고 Depth 변경: $myCurrentAdvertisedDepth -> $shortestPathToRootViaNeighbor")
+                myCurrentAdvertisedDepth = shortestPathToRootViaNeighbor
+                _uiState.update { it.copy(currentSelfAdvertisedDepth = myCurrentAdvertisedDepth) }
+                startOrUpdateAdvertising()
+            }
+        } else if (currentScannedDevices.isEmpty() && myCurrentAdvertisedDepth != 0) {
+            // 주변 기기가 없으면 내 홉수를 0으로 리셋
+            Log.i(TAG, "주변 탐색된 기기 없음. 내 광고 Depth를 0으로 리셋.")
+            myCurrentAdvertisedDepth = 0
+            _uiState.update { it.copy(currentSelfAdvertisedDepth = myCurrentAdvertisedDepth) }
+            startOrUpdateAdvertising()
+        }
+
+        val newNearbyList = updatedNearbyMap.values.toList().sortedWith(
+            compareBy<NearbyPerson> { it.calculatedVisualDepth }
+                .thenByDescending { it.signalLevel }
+                .thenByDescending { it.rssi }
+        )
+        
+        // 디버그 로그 추가
+        Log.d(TAG, "주변 기기 수: ${newNearbyList.size}, UI 표시 여부: ${_uiState.value.nearbyPeople != newNearbyList}")
+        if (newNearbyList.isNotEmpty()) {
+            Log.d(TAG, "첫 번째 기기: 닉네임=${newNearbyList[0].nickname}, 홉수=${newNearbyList[0].calculatedVisualDepth}, RSSI=${newNearbyList[0].rssi}")
+        }
+
+        // 항상 업데이트하도록 변경하여 UI 반영 문제 해결 (동등성 검사 제거)
+        _uiState.update { it.copy(
+            nearbyPeople = newNearbyList,
+            showListButton = newNearbyList.isNotEmpty()
+        ) }
+    }
+
+    fun togglePersonListModal() {
+        _uiState.update { it.copy(showPersonListModal = !it.showPersonListModal) }
+    }
+
+    fun onPersonClick(serverUserIdString: String) = _uiState.update { it.copy(navigateToProfileServerUserIdString = serverUserIdString) }
+    fun onProfileScreenNavigated() = _uiState.update { it.copy(navigateToProfileServerUserIdString = null) }
+    fun setDisplayDepthLevel(level: Int) {
+        _uiState.update { it.copy(displayDepthLevel = level.coerceIn(1, NeighborDiscoveryConstants.DISPLAY_DEPTH_LEVELS.lastOrNull() ?: NeighborDiscoveryConstants.MAX_TRACKABLE_DEPTH)) }
+    }
+    fun clearErrorMessage() = _uiState.update { it.copy(errorMessage = null) }
+
     fun activateAI() {
         val now = System.currentTimeMillis()
-        if (now - lastAiActivationTime < AI_ACTIVATION_DEBOUNCE_MS) {
-            Log.d(TAG, "activateAI() 무시 (debounce)")
+        if (now - lastAiActivationTime < 2000) {
             return
         }
         lastAiActivationTime = now
         _aiActive.value = true
-        Log.d(TAG, "activateAI() → _aiActive = true")
     }
 
-    /** 다이얼로그 닫힐 때 호출 */
     fun deactivateAI() {
         _aiActive.value = false
-        Log.d(TAG, "deactivateAI() → _aiActive = false")
     }
 
-    /* ==================================================
-     *  BLE 스캔 로직 (모킹)
-     * ================================================== */
-
-    /** 실제 BLE 스캔 시작 */
-    fun startScanning() {
-        // 이미 스캔 중이면 무시
-        if (_uiState.value.isScanning && scanningJob != null) return
-
-        _uiState.update { it.copy(
-            isScanning = true,
-            buttonText = "탐색 중...",
-            subTextVisible = true,
-            isBleServiceActive = true,
-            nearbyPeople = emptyList(),
-            showListButton = true
-        )}
-
-        // 모킹용 사람 리스트
-        val predefinedPeople = listOf(
-            NearbyPerson(id = 1, distance = 42f, angle = 45f, signalStrength = 0.85f),   // 0~100 m
-            NearbyPerson(id = 2, distance = 87f, angle = 135f, signalStrength = 0.75f),
-            NearbyPerson(id = 3, distance = 154f, angle = 210f, signalStrength = 0.55f),   // 100~300 m
-            NearbyPerson(id = 4, distance = 267f, angle = 315f, signalStrength = 0.45f),
-            NearbyPerson(id = 5, distance = 345f, angle = 90f, signalStrength = 0.35f),   // 300 m+
-            NearbyPerson(id = 6, distance = 478f, angle = 270f, signalStrength = 0.25f)
-        )
-
-        scanningJob = viewModelScope.launch {
-            val discovered = mutableListOf<NearbyPerson>()
-
-            // 가까운 사람부터 하나씩 "발견"
-            for (person in predefinedPeople.sortedBy { it.distance }) {
-                delay(800)
-                discovered.add(person)
-                _uiState.update { it.copy(nearbyPeople = discovered.toList()) }
-            }
-
-            // 이후 5초마다 상태 유지 갱신
-            while (true) {
-                delay(5_000)
-                _uiState.update { it.copy(buttonText = "탐색 중...") }
-            }
+    fun startScanAutomatically() {
+        val currentState = _uiState.value
+        Log.d(TAG, "startScanAutomatically 호출됨. 현재 스캔 상태: ${currentState.isScanningActive}, BLE 준비 상태: ${currentState.isBleReady}")
+        
+        if (!currentState.isScanningActive && currentState.isBleReady) {
+            // BLE가 준비되어 있고 스캔 중이 아니면 스캔 시작
+            _uiState.update { it.copy(isScanningActive = true, buttonText = "탐색 중...", errorMessage = null) }
+            startBleOperationsInternal()
+        } else if (!currentState.isBleReady) {
+            // BLE가 준비되지 않으면 실패 로그 출력
+            Log.w(TAG, "자동 스캔 실패: BLE 준비 안됨. (권한=${currentState.blePermissionsGranted}, BT=${currentState.isBluetoothEnabled}, 로그인=${myServerUserId != -1L})")
         }
     }
 
-    /* 스캔 토글 (현재는 항상 스캔 중이므로 미사용) */
-    fun toggleScan() { /* no-op */ }
-
-    /* ==================================================
-     *  UI 상호작용 헬퍼
-     * ================================================== */
-
-    fun togglePersonListModal() {
-        if (_uiState.value.nearbyPeople.isNotEmpty()) {
-            _uiState.update { it.copy(showPersonListModal = !it.showPersonListModal) }
-        }
+    // 화면의 "BLE 상태 확인" 버튼 등에서 명시적으로 호출될 때 사용
+    fun checkBluetoothStateAndPermissionsExplicitly() {
+        Log.d(TAG, "명시적 BLE 상태 및 권한 확인 요청")
+        activityRef?.get()?.let {
+            updateBluetoothStateAndPermissions(it)
+        } ?: checkBleReadyState() // Activity 없으면 상태만 재확인
     }
 
-    fun restoreScanningStateIfNeeded() {
-        if (scanningJob == null || !_uiState.value.isScanning) {
-            scanningJob?.cancel()
-            startScanning()
-        }
-    }
-
-    fun onPersonClick(userId: String) {
-        _uiState.update { it.copy(navigateToProfile = userId) }
-    }
-
-    fun onProfileScreenNavigated() {
-        _uiState.update { it.copy(navigateToProfile = null) }
-    }
-
-    /* ==================================================
-     *  BLE 권한/상태 처리 (TODO)
-     * ================================================== */
-
-    @Suppress("UNUSED_PARAMETER")
-    fun updateBlePermissionStatus(granted: Boolean) {
-        // TODO: BLE 권한 처리 로직
-    }
-
-    @Suppress("UNUSED_PARAMETER")
-    fun updateBluetoothState(enabled: Boolean) {
-        // TODO: 블루투스 on/off 처리 로직
-    }
-
-    /* -------------------------------------------------- *
-     * ViewModel 소멸 시 자원 정리
-     * -------------------------------------------------- */
     override fun onCleared() {
         super.onCleared()
-        scanningJob?.cancel()
-        // TODO: BLE 서비스 정리
+        Log.d(TAG, "ViewModel onCleared: 모든 BLE 리소스 해제")
+        stopBleOperationsInternal()
+        NeighborScanner.release()
+        NeighborAdvertiser.release()
+        activityRef = null // WeakReference이므로 명시적 null 처리는 불필요할 수 있으나, 확실히 함
+    }
+
+    // 블루투스 상태와 권한을 확인하고 UI 상태 업데이트 (Activity Context 필요)
+    fun updateBluetoothStateAndPermissions(activity: Activity) {
+        Log.d(TAG, "updateBluetoothStateAndPermissions 호출됨")
+        // 1. 블루투스 활성화 상태 확인
+        val bluetoothManager = activity.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        val isBluetoothOn = bluetoothManager?.adapter?.isEnabled == true
+        Log.i(TAG, "블루투스 상태: ${if (isBluetoothOn) "활성화" else "비활성화"}")
+        updateBluetoothState(isBluetoothOn)
+        
+        // 2. BLE 권한 상태 확인
+        val hasBluetoothScanPermission = ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        val hasBluetoothAdvertisePermission = ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED
+        val hasBluetoothConnectPermission = ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        
+        // 3. 위치 권한 확인 (Android 12 미만에서 필요)
+        val needLocationPermission = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S
+        val hasLocationPermission = if (needLocationPermission) {
+            ContextCompat.checkSelfPermission(activity, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        } else true
+        
+        // 4. 결과 기록
+        val blePermissionsGranted = hasBluetoothScanPermission && hasBluetoothAdvertisePermission && hasBluetoothConnectPermission && (hasLocationPermission || !needLocationPermission)
+        Log.i(TAG, "BLE 권한 전체: ${if (blePermissionsGranted) "승인됨" else "거부됨"}")
+        Log.i(TAG, "  BLUETOOTH_SCAN: ${if (hasBluetoothScanPermission) "승인됨" else "거부됨"}")
+        Log.i(TAG, "  BLUETOOTH_ADVERTISE: ${if (hasBluetoothAdvertisePermission) "승인됨" else "거부됨"}")
+        Log.i(TAG, "  BLUETOOTH_CONNECT: ${if (hasBluetoothConnectPermission) "승인됨" else "거부됨"}")
+        if (needLocationPermission) {
+            Log.i(TAG, "  ACCESS_FINE_LOCATION: ${if (hasLocationPermission) "승인됨" else "거부됨"} (Android 12 미만)")
+        }
+        
+        updateBlePermissionStatus(blePermissionsGranted)
+    }
+    
+    /**
+     * 블루투스가 꺼져 있을 때 사용자에게 블루투스를 켜도록 요청하는 메서드
+     * MainActivity에서 호출하여 블루투스 활성화 다이얼로그를 표시합니다.
+     */
+    fun requestBluetoothEnable() {
+        Log.i(TAG, "블루투스 활성화 요청")
+        // 실제 요청은 MainActivity에서 처리됩니다.
+        // 이 메서드는 MainScreen에서 사용자가 스캔 버튼을 눌렀을 때 BLE가 준비되지 않았다면 호출됩니다.
     }
 }

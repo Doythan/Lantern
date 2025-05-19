@@ -1,5 +1,10 @@
 package com.ssafy.lanterns.ui.screens.main
 
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -38,6 +43,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
@@ -54,8 +60,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import android.content.Context
+import android.util.Log
 import com.ssafy.lanterns.ui.navigation.AppDestinations
+import android.bluetooth.BluetoothManager
+import android.content.Context
 
 /**
  * 메인 화면
@@ -71,10 +79,12 @@ fun MainScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
     paddingValues: PaddingValues = PaddingValues(0.dp),
-    viewModel: MainViewModel = hiltViewModel()
+    viewModel: MainViewModel = hiltViewModel(),
+    onDeviceAIViewModel: OnDeviceAIViewModel = hiltViewModel()
 ) {
     // ViewModel로부터 UI 상태 수집
     val uiState by viewModel.uiState.collectAsState()
+    val aiActive by viewModel.aiActive.collectAsState()
     
     // 코루틴 스코프
     val coroutineScope = rememberCoroutineScope()
@@ -85,49 +95,144 @@ fun MainScreen(
     val rippleAnimatable2 = remember { Animatable(0f) }
     val rippleAnimatable3 = remember { Animatable(0f) }
     
-    // 생명주기 관찰자 - 업데이트된 패키지 사용
+    // 생명주기 관찰자
     val lifecycleOwner = LocalLifecycleOwner.current
-    // TODO: context 변수는 BLE 로직 구현 시 사용될 예정입니다.
-    @Suppress("UNUSED_VARIABLE")
     val context = LocalContext.current
     
-    // navigateToProfile 상태가 변경되면 프로필 화면으로 이동
-    LaunchedEffect(uiState.navigateToProfile) {
-        uiState.navigateToProfile?.let { userId ->
-            // 프로필 화면으로 이동 (프로필 화면에서 채팅하기 버튼으로 채팅 화면 이동)
-            val person = uiState.nearbyPeople.find { it.userId == userId }
+    // 필요한 BLE 권한 정의
+    val blePermissions = listOfNotNull(
+        Manifest.permission.BLUETOOTH_SCAN,
+        Manifest.permission.BLUETOOTH_ADVERTISE,
+        Manifest.permission.BLUETOOTH_CONNECT,
+        // Android 12 미만에서는 ACCESS_FINE_LOCATION도 필요할 수 있음
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) Manifest.permission.ACCESS_FINE_LOCATION else null
+    ).toTypedArray()
+
+    // 권한 요청 런처
+    val requestPermissionsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissionsResult ->
+        val allGranted = permissionsResult.all { it.value }
+        viewModel.updateBlePermissionStatus(allGranted)
+        if (!allGranted) {
+            Log.e("MainScreen", "필수 BLE 권한이 거부되었습니다.")
+            // 사용자에게 권한이 필요함을 알리는 UI 로직 추가 (예: Toast 메시지)
+        }
+    }
+    
+    // 블루투스 활성화 요청 런처
+    val requestBluetoothEnableLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            viewModel.updateBluetoothState(true)
+        } else {
+            Log.e("MainScreen", "사용자가 블루투스 활성화를 거부했습니다.")
+            // 블루투스가 필요함을 알리는 UI 로직 추가 (예: Toast 메시지)
+        }
+    }
+
+    // 권한 상태 확인 및 요청 로직
+    fun checkAndRequestPermissions() {
+        val allPermissionsGranted = blePermissions.all {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (allPermissionsGranted) {
+            viewModel.updateBlePermissionStatus(true)
+        } else {
+            viewModel.updateBlePermissionStatus(false) // 먼저 false로 설정
+            requestPermissionsLauncher.launch(blePermissions)
+        }
+    }
+    
+    // 블루투스 활성화 요청 함수
+    fun requestBluetoothEnable() {
+        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        if (bluetoothManager?.adapter?.isEnabled == false) {
+            try {
+                val enableBtIntent = android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                requestBluetoothEnableLauncher.launch(enableBtIntent)
+            } catch (e: Exception) {
+                Log.e("MainScreen", "블루투스 활성화 요청 중 오류: ${e.message}")
+            }
+        }
+    }
+
+    // 초기화 시 권한 확인 및 요청
+    LaunchedEffect(Unit) {
+        checkAndRequestPermissions() // 권한 먼저 확인 및 요청
+        requestBluetoothEnable() // 블루투스 활성화 요청
+        viewModel.initialize(context as Activity)
+        // 화면 진입 시 자동으로 스캔 시작
+        delay(500) // 초기화 후 약간의 딜레이를 주어 BLE 초기화가 완료되도록 함
+        viewModel.startScanAutomatically() // 자동 스캔 시작 메서드 호출
+    }
+    
+    // navigateToProfileServerUserIdString 상태가 변경되면 프로필 화면으로 이동
+    LaunchedEffect(uiState.navigateToProfileServerUserIdString) {
+        uiState.navigateToProfileServerUserIdString?.let { userId ->
+            // 프로필 화면으로 이동
+            val person = uiState.nearbyPeople.find { it.serverUserIdString == userId }
             if (person != null) {
-                val route = "profile/${userId}/${person.name}/${person.distance.toInt()}m"
+                val route = "profile/${userId}/${person.nickname}/${person.signalLevel}"
                 navController.navigate(route)
             }
             viewModel.onProfileScreenNavigated() // 네비게이션 후 상태 초기화
         }
     }
     
-    // 생명주기에 따른 스캔 상태 관리
+    // AI 활성화 상태 관찰
+    LaunchedEffect(aiActive) {
+        if (aiActive) {
+            // AI 활성화 로직 (별도 처리)
+        }
+    }
+    
+    // 스캔 버튼 클릭 처리 함수 추가
+    fun onScanButtonClick() {
+        // 현재 상태 확인
+        if (!uiState.isBleReady) {
+            // BLE가 준비되지 않은 경우 원인 파악 및 조치
+            when {
+                !uiState.blePermissionsGranted -> {
+                    // 권한이 없는 경우
+                    Log.d("MainScreen", "권한이 없어 요청합니다.")
+                    checkAndRequestPermissions()
+                }
+                !uiState.isBluetoothEnabled -> {
+                    // 블루투스가 꺼져 있는 경우
+                    Log.d("MainScreen", "블루투스가 꺼져 있어 활성화를 요청합니다.")
+                    requestBluetoothEnable()
+                }
+                else -> {
+                    // 기타 원인 (로그인 등)
+                    Log.d("MainScreen", "BLE 준비 안됨. 원인: ${uiState.errorMessage}")
+                }
+            }
+        }
+        
+        // 항상 toggleScan을 호출하여 ViewModel에서 상태 처리
+        viewModel.toggleScan()
+    }
+    
+    // 생명주기에 따른 스캔 상태 관리 및 권한 재확인
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                // 화면으로 돌아왔을 때 스캔 상태 복원
                 Lifecycle.Event.ON_RESUME -> {
-                    viewModel.restoreScanningStateIfNeeded()
-                    if (uiState.isScanning) {
-                        // 스캔 복원 로직
+                    Log.d("MainScreen", "ON_RESUME: 권한 재확인 및 스캔 상태 복원 시도")
+                    checkAndRequestPermissions() // 화면 재개 시 권한 재확인
+                    viewModel.onScreenResumed()
+                    if (uiState.isScanningActive) {
                         rippleVisible.value = true
-                        // 스캔 애니메이션 재시작
                         coroutineScope.launch {
                             runRippleAnimation(rippleAnimatable1, rippleAnimatable2, rippleAnimatable3)
                         }
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    // 화면이 백그라운드로 갈 때 애니메이션만 일시 중단
-                    // 실제 스캔 상태는 ViewModel에 유지됨
-                    rippleVisible.value = false
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    // 여기서는 애니메이션 관련된 리소스만 정리
-                    // 스캔 자체는 ViewModel에서 유지됨
+                    Log.d("MainScreen", "ON_PAUSE: 스캔 중지")
+                    viewModel.onScreenPaused()
                     rippleVisible.value = false
                 }
                 else -> { /* 다른 이벤트는 처리하지 않음 */ }
@@ -135,13 +240,14 @@ fun MainScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            Log.d("MainScreen", "ON_DISPOSE: Observer 제거")
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
     
     // 버튼 스케일 애니메이션
     val buttonScale by animateFloatAsState(
-        targetValue = if (uiState.isScanning) 0.9f else 1f,
+        targetValue = if (uiState.isScanningActive) 0.9f else 1f,
         animationSpec = tween(200, easing = FastOutSlowInEasing),
         label = "buttonScale"
     )
@@ -191,12 +297,12 @@ fun MainScreen(
     )
     
     // 스캔 상태에 따른 애니메이션 제어
-    LaunchedEffect(uiState.isScanning) {
-        if (uiState.isScanning) {
+    LaunchedEffect(uiState.isScanningActive) {
+        if (uiState.isScanningActive) {
             rippleVisible.value = true
             
             // 리플 애니메이션 무한 반복
-            while (uiState.isScanning) {
+            while (uiState.isScanningActive) {
                 // 리플 애니메이션 실행
                 runRippleAnimation(rippleAnimatable1, rippleAnimatable2, rippleAnimatable3)
                 
@@ -218,32 +324,30 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
-                    color = MaterialTheme.colorScheme.background
+                    brush = Brush.verticalGradient(
+                        colors = listOf(NavyTop, NavyBottom)
+                    )
                 )
                 .windowInsetsPadding(WindowInsets.safeDrawing) // 시스템 바 영역 패딩 적용
                 .padding(paddingValues) // 네비게이션 바 영역 패딩 적용
                 .then(modifier),
             contentAlignment = Alignment.Center
         ) {
-
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
-                isScanning = uiState.isScanning,
-                onScanToggle = { 
-                    // 권한과 블루투스 상태가 확인되면 스캔 토글
-                    viewModel.toggleScan()
-                },
-                nearbyPeople = uiState.nearbyPeople,
+                isScanning = uiState.isScanningActive,
+                nearbyPeopleToDisplay = uiState.nearbyPeople.also { 
+                    Log.d("MainScreen", "전체 주변 사람 수: ${it.size}, 필터 적용될 수준: ${uiState.displayDepthLevel}, 표시될 것으로 예상: ${it.filter { p -> p.calculatedVisualDepth <= uiState.displayDepthLevel }.size}")
+                }.filter { it.calculatedVisualDepth <= uiState.displayDepthLevel.coerceAtLeast(3) },
+                currentSelfDepth = uiState.currentSelfAdvertisedDepth,
+                displayDepthLevel = uiState.displayDepthLevel.coerceAtLeast(3),
+                onDisplayDepthChange = viewModel::setDisplayDepthLevel,
                 showPersonListModal = uiState.showPersonListModal,
-                onShowListToggle = { viewModel.togglePersonListModal() },
-                onPersonClick = { userId ->
-                    // 채팅 화면으로 이동
-                    navController.navigate("${AppDestinations.DIRECT_CHAT_ROUTE.replace("{userId}", userId)}")
-                    viewModel.togglePersonListModal() // 모달 닫기
-                },
-                onCallClick = { userId ->
-                    // 통화 화면으로 이동
-                    navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", userId)}")
+                onShowListToggle = viewModel::togglePersonListModal,
+                onDismissModal = { viewModel.togglePersonListModal() },
+                onPersonClick = viewModel::onPersonClick,
+                onCallClick = { serverUserIdString ->
+                    navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", serverUserIdString)}")
                     viewModel.togglePersonListModal() // 모달 닫기
                 },
                 rippleStates = Triple(
@@ -260,8 +364,10 @@ fun MainScreen(
                 ),
                 buttonText = uiState.buttonText,
                 subTextVisible = uiState.subTextVisible,
-                showListButton = uiState.showListButton
+                showListButton = uiState.showListButton,
+                onCheckBluetoothState = { onScanButtonClick() }
             )
+            
         }
     }
 }
