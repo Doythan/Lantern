@@ -17,11 +17,14 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ssafy.lanterns.R // R 클래스 import 확인 (대부분 자동으로 됨)
+import com.ssafy.lanterns.di.EmergencyEventTrigger
 import com.ssafy.lanterns.service.WakeWordService
+import com.ssafy.lanterns.ui.view.main.MainActivity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,7 +61,8 @@ private const val EMERGENCY_VISUAL_DURATION_MILLIS = 8000L // 긴급 시각 효�
 
 @HiltViewModel
 class OnDeviceAIViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    @EmergencyEventTrigger private val emergencyEventTriggerFlow: MutableSharedFlow<Unit>
 ) : AndroidViewModel(context as Application) {
 
     private val _uiState = MutableStateFlow(OnDeviceAIState())
@@ -431,6 +435,14 @@ class OnDeviceAIViewModel @Inject constructor(
                 isEmergencyVisualsActive = true
             )
             emergencyVisualsJob?.cancel() // 이전 작업이 있다면 취소
+
+
+            viewModelScope.launch {
+                Log.d(TAG, "긴급 명령 감지됨. BLE 긴급 구조 요청 전송 시도 (Activity 통해).")
+                emergencyEventTriggerFlow.emit(Unit) // 주입받은 Flow로 이벤트 발행
+                Log.d(TAG, "BLE 긴급 구조 요청 이벤트 발행 완료.")
+            }
+
             emergencyVisualsJob = viewModelScope.launch {
                 Log.d(TAG, "긴급 시각 효과 및 사이렌 루프 시작 (${EMERGENCY_VISUAL_DURATION_MILLIS}ms).")
 
@@ -469,7 +481,7 @@ class OnDeviceAIViewModel @Inject constructor(
                 val ttsMessageForEmergency = if (sirenPlaybackSuccessful) {
                     "주변에 긴급 상황을 알립니다!"
                 } else {
-                    "긴급 상황입니다! 사이렌 재생에 실패했습니다."
+                    "긴급 상황입니다!"
                 }
                 // TTS 호출을 위해 상태 업데이트 (만약 TTS를 여기서 바로 하고 싶다면)
                 // 또는 아래 showResponse를 호출하기 전에 statusMessage를 업데이트 할 수 있습니다.
@@ -543,7 +555,7 @@ class OnDeviceAIViewModel @Inject constructor(
             val response = if (isEmergencyCommand) {
                 // emergencyVisualsJob 내에서 sirenPlaybackSuccessful 값에 따라 메시지가 이미 statusMessage에 반영되었을 수 있음
                 // _uiState.value.statusMessage // 이미 설정된 메시지를 사용하거나,
-                if(mediaPlayer != null && mediaPlayer!!.isPlaying) "주변에 긴급 상황을 알립니다!" else "긴급 상황입니다! 사이렌 재생에 문제가 있었습니다." // 여기서 다시 결정
+                if(mediaPlayer != null && mediaPlayer!!.isPlaying) "주변에 긴급 상황을 알립니다!" else "긴급 상황입니다!" // 여기서 다시 결정
             } else {
                 // 기존 일반 명령어 응답 생성 로직
                 when {
