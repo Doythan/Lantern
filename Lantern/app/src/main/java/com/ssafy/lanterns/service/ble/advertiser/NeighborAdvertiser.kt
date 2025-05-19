@@ -50,7 +50,7 @@ object NeighborAdvertiser {
         if (bluetoothLeAdvertiser == null) Log.e(TAG, "BLE Advertiser 초기화 실패 (또는 지원 안함)")
     }
 
-    fun startAdvertising(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int) {
+    fun startAdvertising(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte = 0) {
         val activity = currentActivityRef?.get() ?: run { 
             Log.e(TAG, "Activity null, 광고 불가")
             return
@@ -78,7 +78,7 @@ object NeighborAdvertiser {
             .setTimeout(0) // 타임아웃 없음 (계속 광고)
             .build()
 
-        val lanternPacket = buildLanternPacket(serverUserId, processedNickname, currentOwnAdvertisedDepth)
+        val lanternPacket = buildLanternPacket(serverUserId, processedNickname, currentOwnAdvertisedDepth, isEmergency)
         if (lanternPacket == null) { 
             Log.e(TAG, "패킷 생성 실패") 
             return 
@@ -192,13 +192,13 @@ object NeighborAdvertiser {
         cancelPendingRetry()
     }
 
-    private fun buildLanternPacket(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int): ByteArray? {
+    private fun buildLanternPacket(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte): ByteArray? {
         try {
             val userIdInt = serverUserId.toInt() // Long -> Int (값 범위 고려, 필요시 서버 ID 정책 변경)
-            val nicknameBytes = processedNickname.toByteArray(StandardCharsets.UTF_8) // 이미 길이 처리된 닉네임
+            val nicknameBytes = processedNickname.toByteArray(StandardCharsets.UTF_8, ) // 이미 길이 처리된 닉네임
 
-            // 패킷 구성: (1)데이터타입 + (1)버전 + (4)서버ID + (1)Depth + (1)닉네임길이 + (n)닉네임
-            val packetSize = 1 + 1 + BleConstants.SERVER_USER_ID_BYTES + BleConstants.DEPTH_BYTES + 1 + nicknameBytes.size
+            // 패킷 구성: (1)데이터타입 + (1)버전 + (4)서버ID + (1)Depth + (1)닉네임길이 + (n)닉네임 + (1)긴급플래그
+            val packetSize = 1 + 1 + BleConstants.SERVER_USER_ID_BYTES + BleConstants.DEPTH_BYTES + 1 + nicknameBytes.size + 1
             if (packetSize > 31) { // BLE 페이로드 최대 크기 엄격하게 체크 (헤더 등 제외하면 더 작음)
                 Log.e(TAG, "최종 패킷 크기($packetSize)가 BLE 광고 제한(31바이트)을 초과합니다.")
                 return null // 너무 크면 null 반환
@@ -212,7 +212,9 @@ object NeighborAdvertiser {
                       "userID=$userIdInt, " +
                       "depth=$currentOwnAdvertisedDepth, " +
                       "nameLen=${nicknameBytes.size}, " +
-                      "name='$processedNickname'")
+                        "name='$processedNickname', " +
+                        "emergency=$isEmergency"
+                )
             }
                   
             val buffer = ByteBuffer.allocate(packetSize).order(ByteOrder.LITTLE_ENDIAN)
@@ -223,6 +225,7 @@ object NeighborAdvertiser {
             buffer.put(currentOwnAdvertisedDepth.toByte()) // 0-255 범위
             buffer.put(nicknameBytes.size.toByte())
             buffer.put(nicknameBytes)
+            buffer.put(isEmergency)
 
             return buffer.array()
         } catch (e: Exception) {
