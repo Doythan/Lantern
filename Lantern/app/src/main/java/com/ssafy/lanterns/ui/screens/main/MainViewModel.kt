@@ -5,8 +5,11 @@ import android.app.Activity
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -21,6 +24,7 @@ import com.ssafy.lanterns.service.ble.scanner.NeighborScanner
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
 import com.ssafy.lanterns.utils.SignalStrengthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,21 +48,22 @@ data class MainScreenUiState(
     val navigateToProfileServerUserIdString: String? = null,
     val displayDepthLevel: Int = NeighborDiscoveryConstants.MAX_DISPLAY_DEPTH_INITIAL,
     val errorMessage: String? = null,
-    val isLoading: Boolean = true, // 초기 사용자 정보 로드 시 true
-    val currentSelfAdvertisedDepth: Int = 0, // UI에 표시 및 광고에 사용될 내 현재 Depth
+    val isLoading: Boolean = true,
+    val currentSelfAdvertisedDepth: Int = 0,
     val subTextVisible: Boolean = true,
     val showListButton: Boolean = false,
     val showEmergencyAlert: Boolean = false,
     val emergencyAlertNickname: String? = null,
-    val isEmergencyVisualEffectActive: Boolean = false, // 화면 깜빡임 및 진동 제어용
-    val currentEmergencyPacketTimestamp: Long = 0L, // 중복 알림 방지용 (선택 사항)
-    val rescueRequestReceived: Boolean = false, // 구조 요청 수신 여부
-    val rescueRequesterNickname: String? = null, // 구조 요청자 닉네임
+    val isEmergencyVisualEffectActive: Boolean = false,
+    val currentEmergencyPacketTimestamp: Long = 0L,
+    val rescueRequestReceived: Boolean = false,
+    val rescueRequesterNickname: String? = null,
 
 )
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    @ApplicationContext private val applicationContext: Context,
     private val userRepository: UserRepository,
     @EmergencyEventTrigger private val emergencyEventTriggerFlow: SharedFlow<Unit>
 ) : ViewModel() {
@@ -106,6 +111,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
+
     fun initialize(activity: Activity) {
         activityRef = WeakReference(activity)
         Log.i(TAG, "ViewModel 초기화 시작")
@@ -128,6 +134,30 @@ class MainViewModel @Inject constructor(
             checkBleReadyState() // 사용자 정보 로드 후 최종 BLE 준비 상태 확인
         }
     }
+
+    private fun vibratePhone() {
+        val vibrator = applicationContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+        if (vibrator?.hasVibrator() == true) { // 진동기 있는지 확인 (선택적)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Android Oreo (API 26) 이상에서는 VibrationEffect 사용
+
+                val timings = longArrayOf(0, 100, 100, 100, 100, 100) // 대기, 진동, 대기, 진동, ... (ms)
+                val amplitudes = intArrayOf(0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE, 0, VibrationEffect.DEFAULT_AMPLITUDE) // 각 타이밍에 대한 진동 강도 (0은 끔)
+                val vibrationEffect = VibrationEffect.createWaveform(timings, amplitudes, -1) // -1은 반복 안 함
+                vibrator.vibrate(vibrationEffect)
+
+                Log.d(TAG, "진동 발생 (Oreo 이상)")
+            } else {
+                // Oreo 미만에서는 deprecated된 vibrate 사용
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(500) // 500ms 동안 진동
+                Log.d(TAG, "진동 발생 (Oreo 미만)")
+            }
+        } else {
+            Log.w(TAG, "기기에 진동 기능이 없거나 사용할 수 없습니다.")
+        }
+    }
+
 
     private fun truncateNicknameForAdv(nickname: String, maxBytes: Int = BleConstants.MAX_NICKNAME_BYTES_ADV): String {
         val originalBytes = nickname.toByteArray(StandardCharsets.UTF_8)
@@ -418,6 +448,12 @@ class MainViewModel @Inject constructor(
                         lastEmergencyNotificationTimestamps[serverUserIdStr] = currentTime
 
                         Log.d(TAG, "긴급 알림 UI 상태 업데이트: Nick='${scannedDevice.nickname}'")
+
+
+                        // <<--- 진동 발생시키기 ---START>>
+                        vibratePhone() // 진동 함수 호출
+                        // <<--- 진동 발생시키기 ---END>>
+
                         // 5초 후 긴급 시각 효과 자동 해제
                         viewModelScope.launch {
                             delay(15000L) // 예: 15초 후 자동 해제 (EMERGENCY_VISUAL_DURATION_MILLIS와는 별개)

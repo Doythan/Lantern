@@ -380,8 +380,8 @@ fun MainScreen(
                 modifier = Modifier.align(Alignment.TopCenter) // Box 내에서 TopCenter로 정렬
             ) {
                 val message = uiState.rescueRequesterNickname?.let { nickname ->
-                    "주변에 구조요청을 원하는 사람(${nickname}님)이 있습니다."
-                } ?: "주변에 구조요청을 원하는 사람이 있습니다."
+                    "주변 50m 내에 (${nickname}님)이 도움을 요청하고 있습니다."
+                } ?: "주변 50m 내에 구조요청을 원하는 사람이 있습니다."
 
                 RescueAlertNotification(
                     message = message,
