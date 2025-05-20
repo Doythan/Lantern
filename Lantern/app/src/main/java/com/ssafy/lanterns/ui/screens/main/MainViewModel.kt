@@ -66,6 +66,9 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainScreenUiState())
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
+
+
+
     private val _aiActive = MutableStateFlow(false)
     val aiActive: StateFlow<Boolean> = _aiActive.asStateFlow()
     private var lastAiActivationTime = 0L
@@ -312,17 +315,24 @@ class MainViewModel @Inject constructor(
             // 5초 후 일반 광고로 복귀 (이 launch는 이미 부모 launch 내에 있으므로 중첩 launch)
             launch {
                 delay(5000L)
+                val isScanning = _uiState.value.isScanningActive
+                val isReady = _uiState.value.isBleReady
                 if (_uiState.value.isScanningActive && _uiState.value.isBleReady) {
-                    Log.d(TAG, "긴급 광고 시간 종료, 일반 광고로 복귀 시도 (MainViewModel)")
+
+                    Log.d(TAG, "5초 후 상태: isScanningActive=$isScanning, isBleReady=$isReady")
                     startOrUpdateAdvertising(isEmergency = 0.toByte())
                 } else {
-                    Log.d(TAG, "긴급 광고 시간 종료되었으나, 스캔이 비활성이거나 BLE가 준비되지 않아 일반 광고로 복귀 안 함.")
+                    Log.w(TAG, "긴급 광고 시간 종료. 일반 광고 복귀 조건 미충족: 스캔 활성=$isScanning, BLE 준비=$isReady")
                 }
             }
         }
     }
 
 
+    private val lastEmergencyNotificationTimestamps = mutableMapOf<String, Long>()
+    private val EMERGENCY_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000L
+    private val EMERGENCY_ALERT_AUTO_DISMISS_MS = 5 * 1000L // 긴급 UI 알림 자동 해제 시간 (15초)
+    private val EMERGENCY_RSSI_THRESHOLD = -80
 
 
     private fun processScanResults() {
@@ -337,13 +347,18 @@ class MainViewModel @Inject constructor(
         var foundAnchorDevice = false
         var shortestPathToRootViaNeighbor = -1
 
+        var newMyCurrentAdvertisedDepth = myCurrentAdvertisedDepth // 현재 값으로 초기화
+        var newFoundAnchorDevice = false
+        var newShortestPathToRootViaNeighbor = if (myCurrentAdvertisedDepth == 0) -1 else myCurrentAdvertisedDepth // 초기값 설정
+
+
         currentScannedDevices.forEach { (bleAddress, scannedDevice) ->
             // 자신의 기기는 무시
             if (scannedDevice.serverUserId == myServerUserId) return@forEach
-            
+
             // 시간 초과된 기기 제거 - NeighborScanner와 동일한 시간 사용
             if (currentTime - scannedDevice.lastSeen > NeighborScanner.DEVICE_EXPIRATION_MS) {
-                Log.d(TAG, "기기 시간 초과 (UI): '${scannedDevice.nickname}'(${scannedDevice.serverUserId}), 마지막 발견: ${(currentTime - scannedDevice.lastSeen) / 1000}초 전")
+                // Log.d(TAG, "기기 시간 초과 (UI): '${scannedDevice.nickname}'(${scannedDevice.serverUserId}), 마지막 발견: ${(currentTime - scannedDevice.lastSeen) / 1000}초 전")
                 NeighborScanner.scannedDevicesMap.remove(bleAddress)
                 SignalStrengthManager.clearHistoryForDevice(bleAddress)
                 return@forEach
@@ -351,39 +366,57 @@ class MainViewModel @Inject constructor(
             // 긴급 플래그 확인 및 처리
             if (scannedDevice.isEmergency == 1.toByte()) {
                 Log.i(TAG, "긴급 패킷 수신: Nick='${scannedDevice.nickname}', sID=${scannedDevice.serverUserId}, RSSI=${scannedDevice.rssi}")
-                // 거리 기반 필터링 (예: RSSI 임계값 사용)
-                // 실제 50m는 RSSI만으로 정확히 판단하기 어려우므로, 여기서는 예시로 강한 신호(-70 이상)일 때 알림
-                if (scannedDevice.rssi >= -70) { // 이 임계값은 테스트를 통해 조정 필요
-                    // 중복 알림 방지 로직 (currentEmergencyPacketTimestamp와 lastSeen 비교)
-                    // 또는 특정 시간 내 동일 ID 알림 무시 등
-                    if (_uiState.value.currentEmergencyPacketTimestamp != scannedDevice.lastSeen || _uiState.value.emergencyAlertNickname != scannedDevice.nickname) {
+
+                val serverUserIdStr = scannedDevice.serverUserId.toString()
+                val lastNotificationTime = lastEmergencyNotificationTimestamps[serverUserIdStr] ?: 0L
+
+                if (currentTime - lastNotificationTime > EMERGENCY_NOTIFICATION_COOLDOWN_MS) {
+
+                    // 거리 기반 필터링 (예: RSSI 임계값 사용)
+                    // 실제 50m는 RSSI만으로 정확히 판단하기 어려우므로, 여기서는 예시로 강한 신호(-70 이상)일 때 알림
+                    if (scannedDevice.rssi >= -70) { // 이 임계값은 테스트를 통해 조정 필요
+                        Log.d(
+                            TAG,
+                            "수신: 새로운 긴급 구조 요청 알림 표시 예정. Nick='${scannedDevice.nickname}' (쿨다운 통과)"
+                        )
+                        // 중복 알림 방지 로직 (currentEmergencyPacketTimestamp와 lastSeen 비교)
+                        // 또는 특정 시간 내 동일 ID 알림 무시 등
+
                         _uiState.update {
                             it.copy(
-                                showEmergencyAlert = true,
-                                emergencyAlertNickname = scannedDevice.nickname,
-                                isEmergencyVisualEffectActive = true,
-                                currentEmergencyPacketTimestamp = scannedDevice.lastSeen
+                                // showEmergencyAlert = true, // 이 변수는 이전의 다른 시각/청각 효과용으로 남겨두거나
+                                // rescueRequestReceived와 통합 고려.
+                                // 여기서는 새로운 UI 상태 변수를 사용한다고 가정.
+                                rescueRequestReceived = true,
+                                rescueRequesterNickname = scannedDevice.nickname
+                                // isEmergencyVisualEffectActive = true, // 필요시 이 효과도 다시 활성화
+                                // currentEmergencyPacketTimestamp = scannedDevice.lastSeen // 이 변수의 역할을 재정의하거나 다른 변수 사용 고려
                             )
                         }
+                        lastEmergencyNotificationTimestamps[serverUserIdStr] = currentTime
+
                         Log.d(TAG, "긴급 알림 UI 상태 업데이트: Nick='${scannedDevice.nickname}'")
                         // 5초 후 긴급 시각 효과 자동 해제
                         viewModelScope.launch {
-                            delay(5000L)
+                            delay(15000L) // 예: 15초 후 자동 해제 (EMERGENCY_VISUAL_DURATION_MILLIS와는 별개)
                             // 타이머 만료 시, 현재 알림이 여전히 동일한 사용자의 것인지 확인 후 해제
-                            if (_uiState.value.showEmergencyAlert && _uiState.value.currentEmergencyPacketTimestamp == scannedDevice.lastSeen) {
-                                _uiState.update {
-                                    it.copy(isEmergencyVisualEffectActive = false)
-                                }
-                                Log.d(TAG, "5초 후 긴급 시각 효과 자동 해제: Nick='${scannedDevice.nickname}'")
+                            if (_uiState.value.rescueRequestReceived && _uiState.value.rescueRequesterNickname == scannedDevice.nickname) {
+                                dismissRescueAlert() // rescueRequestReceived = false, rescueRequesterNickname = null 로 설정
                             }
                         }
                     } else {
-                        Log.d(TAG, "중복 긴급 알림 무시: Nick='${scannedDevice.nickname}'")
+                        Log.d(TAG, "수신된 긴급 패킷의 신호가 약함 (RSSI: ${scannedDevice.rssi}). 알림 표시 안 함.")
                     }
-                } else {
-                    Log.d(TAG, "수신된 긴급 패킷의 신호가 약함 (RSSI: ${scannedDevice.rssi}). 알림 표시 안 함.")
+                }else {
+                        Log.d(
+                            TAG,
+                            "수신: '${scannedDevice.nickname}'로부터 온 긴급 구조 요청이지만, 쿨다운(${EMERGENCY_NOTIFICATION_COOLDOWN_MS / 60000}분) 시간 내이므로 UI 알림 무시."
+                        )
+                    }
                 }
-            }
+
+
+
 
 
 
