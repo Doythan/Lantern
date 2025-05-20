@@ -4,6 +4,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Qualifier
@@ -21,7 +22,7 @@ object EventModule {
     @Singleton
     @Provides
     fun provideEmergencyEventFlow(): MutableSharedFlow<Unit> {
-        return MutableSharedFlow()
+        return MutableSharedFlow(replay = 0, extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     }
 
     @EmergencyEventTrigger
