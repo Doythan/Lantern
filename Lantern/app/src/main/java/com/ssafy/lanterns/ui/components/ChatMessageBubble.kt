@@ -53,6 +53,7 @@ fun ChatMessageBubble(
     senderProfileId: Int? = null,
     navController: NavController? = null,
     distance: Float = 50f,
+    isRelayed: Boolean = false,
     chatBubbleColor: Color = if (isMe) 
                                MaterialTheme.colorScheme.secondary.copy(alpha = 0.15f)
                                .compositeOver(MaterialTheme.colorScheme.primaryContainer)
@@ -154,6 +155,16 @@ fun ChatMessageBubble(
                         style = MaterialTheme.typography.bodyLarge 
                     )
                     
+                    if (isRelayed) {
+                        Spacer(modifier = Modifier.height(1.dp))
+                        Text(
+                            text = "릴레이됨",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = metaTextColor.copy(alpha = 0.8f),
+                            modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
+                        )
+                    }
+                    
                     Spacer(modifier = Modifier.height(2.dp))
                     
                     Text(
@@ -237,7 +248,8 @@ fun ChatMessageBubblePreview() {
                 time = "10:21 PM",
                 isMe = true,
                 senderProfileId = 0,
-                navController = dummyNavController
+                navController = dummyNavController,
+                isRelayed = false
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -248,7 +260,8 @@ fun ChatMessageBubblePreview() {
                 time = "10:22 PM",
                 isMe = false,
                 senderProfileId = 2,
-                navController = dummyNavController
+                navController = dummyNavController,
+                isRelayed = true
             )
             Spacer(modifier = Modifier.height(8.dp))
 

@@ -11,6 +11,7 @@ import androidx.compose.runtime.State
 import androidx.lifecycle.viewModelScope
 import com.ssafy.lanterns.data.model.Messages
 import com.ssafy.lanterns.data.repository.MessagesDao
+import com.ssafy.lanterns.ui.components.ChatUser
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -33,7 +34,8 @@ data class ChatMessage(
     val time: Long, // 타임스탬프 (millis)
     val isMe: Boolean = false,
     val senderProfileId: Int? = null,
-    val distance: Float = 0f // PublicChat에서는 기본값 또는 미사용
+    val distance: Float = 0f, // PublicChat에서는 기본값 또는 미사용
+    val isRelayed: Boolean = false // 릴레이된 메시지 여부
 )
 
 @HiltViewModel
@@ -46,6 +48,14 @@ class PublicChatScreenViewModel @Inject constructor(
 
     private val _messages = mutableStateOf<List<ChatMessage>>(emptyList())
     val messages: State<List<ChatMessage>> = _messages
+    
+    // 채팅방 참여자 정보를 위한 State 추가
+    private val _nearbyUsers = mutableStateOf<List<ChatUser>>(emptyList())
+    val nearbyUsers: State<List<ChatUser>> = _nearbyUsers
+    
+    // 시스템 메시지 표시 여부를 제어하는 Flag 추가 (기본값 false로 시스템 메시지 제거)
+    private val _showSystemMessages = mutableStateOf(false)
+    val showSystemMessages: State<Boolean> = _showSystemMessages
 
     init {
         viewModelScope.launch {
@@ -66,7 +76,8 @@ class PublicChatScreenViewModel @Inject constructor(
             isMe = isMe,
             senderProfileId = if (isMe) _currentUser.value?.selectedProfileImageNumber
             else if (dbMessage.userId == SYSTEM_USER_ID) -1 // 시스템 아이콘
-            else _currentUser.value?.let { if (it.userId == dbMessage.userId) it.selectedProfileImageNumber else null } ?: 1 // 임시로 기본 프로필
+            else _currentUser.value?.let { if (it.userId == dbMessage.userId) it.selectedProfileImageNumber else null } ?: 1, // 임시로 기본 프로필
+            isRelayed = false // DB에서 불러온 메시지는 릴레이된 것이 아님 (또는 해당 정보가 없음)
         )
     }
 
@@ -79,7 +90,13 @@ class PublicChatScreenViewModel @Inject constructor(
     private fun loadMessages() {
         viewModelScope.launch {
             val dbMessages = messagesDao.getMessages(PUBLIC_CHAT_ROOM_ID, limit = 200, offset = 0) // 최근 200개
-            val mappedMessages = dbMessages.map { dbMsg ->
+            
+            // 시스템 메시지 필터링 (시스템 메시지 제거)
+            val filteredMessages = dbMessages.filter { dbMsg ->
+                dbMsg.userId != SYSTEM_USER_ID || _showSystemMessages.value
+            }
+            
+            val mappedMessages = filteredMessages.map { dbMsg ->
                 val senderNickname = fetchSenderNickname(dbMsg.userId)
                 val senderProfileId = if (dbMsg.userId == SYSTEM_USER_ID) -1
                 else userRepository.getUserById(dbMsg.userId)?.selectedProfileImageNumber ?: 1
@@ -89,14 +106,24 @@ class PublicChatScreenViewModel @Inject constructor(
                     text = dbMsg.text,
                     time = dbMsg.date.toInstant(ZoneOffset.UTC).toEpochMilli(),
                     isMe = dbMsg.userId == _currentUser.value?.userId,
-                    senderProfileId = senderProfileId
+                    senderProfileId = senderProfileId,
+                    isRelayed = false // DB에서 불러온 메시지
                 )
             }
             _messages.value = mappedMessages.reversed() // 최신 메시지가 아래로
-
-            if (_messages.value.isEmpty()) {
+            
+            // 시스템 메시지 없이도 채팅방 초기화하도록 변경
+            if (_messages.value.isEmpty() && _showSystemMessages.value) {
                 initializeDefaultMessages()
             }
+        }
+    }
+
+    // 시스템 메시지 표시 여부 설정 함수 추가
+    fun setShowSystemMessages(show: Boolean) {
+        if (_showSystemMessages.value != show) {
+            _showSystemMessages.value = show
+            loadMessages() // 메시지 다시 로드하여 필터링 적용
         }
     }
 
@@ -119,15 +146,38 @@ class PublicChatScreenViewModel @Inject constructor(
             }
         }
     }
+    
+    // 채팅 참여자 추가 함수
+    fun addNearbyUser(chatUser: ChatUser) {
+        val currentUsers = _nearbyUsers.value.toMutableList()
+        // 중복 체크: 이름이 같은 사용자가 있으면 업데이트만 하고 넘어감
+        val existingUserIndex = currentUsers.indexOfFirst { it.name == chatUser.name }
+        
+        if (existingUserIndex != -1) {
+            // 기존 사용자 정보 업데이트 (거리, 메시지 카운트 등)
+            currentUsers[existingUserIndex] = currentUsers[existingUserIndex].copy(
+                distance = chatUser.distance,
+                messageCount = currentUsers[existingUserIndex].messageCount + 1
+            )
+        } else {
+            // 새 사용자 추가
+            currentUsers.add(chatUser)
+        }
+        
+        _nearbyUsers.value = currentUsers
+    }
 
     fun addMessage(chatMessageUi: ChatMessage) {
         viewModelScope.launch {
             val currentUserId = _currentUser.value?.userId
             var rawSenderFromBle = chatMessageUi.sender // Scanner에서 온 값 (형식: "닉네임" 또는 "닉네임|메시지부분2")
             var rawTextFromBle = chatMessageUi.text   // Scanner에서 온 값 (형식: "메시지부분1")
+            val isRelayedMessage = chatMessageUi.isRelayed // Scanner에서 전달된 릴레이 여부
 
             var finalSenderNickname = "익명" // 최종적으로 사용할 닉네임
             var finalMessageText = ""    // 최종적으로 사용할 메시지 본문
+
+            Log.d("PublicChatVM_AddMsg", "수신된 ChatMessageUI: sender='${rawSenderFromBle}', text='${rawTextFromBle}', isRelayed=$isRelayedMessage")
 
             // --- ViewModel 레벨에서 닉네임 및 메시지 재구성 시도 ---
             if (chatMessageUi.isMe) {
@@ -203,7 +253,8 @@ class PublicChatScreenViewModel @Inject constructor(
                     sender = finalSenderNickname,
                     text = finalMessageText,
                     isMe = (senderUserIdToSaveInMessage == currentUserId),
-                    senderProfileId = senderUser?.selectedProfileImageNumber ?: 1
+                    senderProfileId = senderUser?.selectedProfileImageNumber ?: 1,
+                    isRelayed = isRelayedMessage // 릴레이 여부 유지
                 )
                 _messages.value = listOf(tempChatMessage) + _messages.value.filterNot { it.id == 0L && it.time == tempChatMessage.time }
                 return@launch
@@ -216,7 +267,8 @@ class PublicChatScreenViewModel @Inject constructor(
                 text = savedDbMessage.text,
                 time = savedDbMessage.date.toInstant(ZoneOffset.UTC).toEpochMilli(),
                 isMe = (savedDbMessage.userId == currentUserId),
-                senderProfileId = senderUser?.selectedProfileImageNumber ?: 1
+                senderProfileId = senderUser?.selectedProfileImageNumber ?: 1,
+                isRelayed = isRelayedMessage // 릴레이 여부 전달
             )
             _messages.value = listOf(newChatMessage) + _messages.value.filterNot { it.id == 0L && it.time == newChatMessage.time }
         }

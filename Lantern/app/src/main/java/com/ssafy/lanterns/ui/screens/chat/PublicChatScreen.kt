@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.LinearScale
+import androidx.compose.material.icons.filled.ViewWeek
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -82,8 +84,10 @@ fun PublicChatScreen(
     var showUsersModal by remember { mutableStateOf(false) }
     var messageInput by remember { mutableStateOf("") }
     var canSendMessage by remember { mutableStateOf(true) }
+    var advertisingMode by remember { mutableStateOf(AdvertiserManager.ADVERTISING_MODE_CONTINUOUS) }
 
-    val nearbyUsers = remember { mutableStateListOf<ChatUser>() }
+    // ViewModel에서 관리하는 nearbyUsers로 변경
+    val nearbyUsers by viewModel.nearbyUsers
     val currentUser by viewModel.currentUser
     val messages by viewModel.messages // ViewModel의 messages 상태를 관찰
 
@@ -105,9 +109,14 @@ fun PublicChatScreen(
 
         viewModel.addMessage(newChatMessage) // ViewModel을 통해 메시지 추가 (DB 저장 포함)
 
-        // BLE 광고 로직 (기존 유지)
+        // BLE 광고 로직 - 현재 광고 모드 설정 추가
         val splitList = splitMessageByByteLength(messageInput)
-        Log.d("PublicChat", "메시지 전송: $messageInput, 분할된 메시지: ${splitList.size}개 패킷")
+        Log.d("PublicChat", "메시지 전송: $messageInput, 분할된 메시지: ${splitList.size}개 패킷, 광고 모드: ${if (advertisingMode == AdvertiserManager.ADVERTISING_MODE_CONTINUOUS) "연속" else "분할"}")
+        
+        // 현재 선택된 광고 모드 설정
+        AdvertiserManager.setAdvertisingMode(advertisingMode)
+        
+        // 메시지 광고 시작
         AdvertiserManager.startAdvertising(
             messageList = splitList,
             email = senderName,
@@ -141,7 +150,7 @@ fun PublicChatScreen(
             Log.d("PublicChatScreen", "권한 있음.")
             if (isBluetoothEnabledResult) {
                 Log.d("PublicChatScreen", "블루투스 활성화됨. 스캔 시작 시도.")
-                ScannerManager.startScanning(context as Activity) { sender, text ->
+                ScannerManager.startScanning(context as Activity) { sender, text, isRelayed ->
                     val receivedMessage = ChatMessage(
                         id = viewModel.getNextMessageId(), // ViewModel 통해 ID 생성
                         sender = sender,
@@ -149,16 +158,18 @@ fun PublicChatScreen(
                         time = System.currentTimeMillis(),
                         isMe = false,
                         senderProfileId = null, // 필요시 스캔 결과에서 프로필 ID 추출
-                        distance = 0f
+                        distance = 0f,
+                        isRelayed = isRelayed // 스캐너에서 받은 릴레이 여부 전달
                     )
                     viewModel.addMessage(receivedMessage) // ViewModel 통해 수신 메시지 추가 (DB 저장 포함)
 
-                    if (sender != "Unknown" && nearbyUsers.none { it.name == sender }) {
-                        nearbyUsers.add(
+                    if (sender != "Unknown") {
+                        // nearbyUsers 추가 로직을 ViewModel로 이동
+                        viewModel.addNearbyUser(
                             ChatUser(
-                                id = nearbyUsers.size + 1,
+                                id = System.currentTimeMillis().toInt(), // 고유 ID 생성
                                 name = sender,
-                                distance = 100f,
+                                distance = 100f, // 기본 거리 값
                                 messageCount = 1f
                             )
                         )
@@ -168,7 +179,6 @@ fun PublicChatScreen(
                 Log.d("PublicChatScreen", "블루투스가 활성화되지 않았습니다. 스캔 시작 안함.")
             }
         }
-        // ViewModel의 initializeDefaultMessages는 ViewModel의 init 블록에서 호출되므로 여기서 중복 호출 필요 없음
     }
 
     DisposableEffect(Unit) {
@@ -179,10 +189,14 @@ fun PublicChatScreen(
         }
     }
 
+    // 스크롤 자동 이동 문제 수정 - 새 메시지가 오면 항상 스크롤 (사용자가 스크롤 중인 경우만 제외)
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty() && listState.firstVisibleItemIndex < 2 && listState.firstVisibleItemScrollOffset == 0) { // 자동 스크롤 조건 강화
-            coroutineScope.launch {
-                listState.animateScrollToItem(0) // 새 메시지 오면 맨 아래로 스크롤 (LazyColumn의 reverseLayout=true)
+        if (messages.isNotEmpty()) {
+            // 사용자가 스크롤을 올리고 있는 중이 아니라면 자동 스크롤
+            if (!listState.isScrollInProgress) {
+                coroutineScope.launch {
+                    listState.animateScrollToItem(0) // 맨 아래로 스크롤 (reverseLayout=true)
+                }
             }
         }
     }
@@ -220,6 +234,24 @@ fun PublicChatScreen(
                         }
                     },
                     actions = {
+                        // 분할모드일 때는 초록색으로 표시하도록 변경
+                        IconButton(
+                            onClick = {
+                                advertisingMode = if (advertisingMode == AdvertiserManager.ADVERTISING_MODE_CONTINUOUS) 
+                                    AdvertiserManager.ADVERTISING_MODE_SPLIT else AdvertiserManager.ADVERTISING_MODE_CONTINUOUS
+                                AdvertiserManager.setAdvertisingMode(advertisingMode)
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (advertisingMode == AdvertiserManager.ADVERTISING_MODE_CONTINUOUS) 
+                                    Icons.Default.LinearScale else Icons.Default.ViewWeek,
+                                contentDescription = "광고 모드 전환",
+                                tint = if (advertisingMode == AdvertiserManager.ADVERTISING_MODE_SPLIT)
+                                    ConnectionNear  // 분할모드일 때 초록색
+                                else
+                                    MaterialTheme.colorScheme.secondary  // 일반모드일 때 기본 색상
+                            )
+                        }
                         IconButton(onClick = { showUsersModal = true }) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -267,8 +299,16 @@ fun PublicChatScreen(
                             senderProfileId = if(msg.isMe) currentUser?.selectedProfileImageNumber else msg.senderProfileId,
                             navController = navController,
                             distance = msg.distance,
-                            chatBubbleColor = if (msg.isMe) ChatBubbleMine else ChatBubbleOthers,
-                            textColor = MaterialTheme.colorScheme.onBackground,
+                            isRelayed = msg.isRelayed,
+                            // 내 메시지 말풍선 색상 변경
+                            chatBubbleColor = if (msg.isMe) 
+                                LanternYellow.copy(alpha = 0.4f) // 더 눈에 띄는 색상으로 변경
+                            else 
+                                ChatBubbleOthers,
+                            textColor = if (msg.isMe)
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
+                            else
+                                MaterialTheme.colorScheme.onBackground,
                             metaTextColor = MaterialTheme.colorScheme.secondary
                         )
                         Spacer(modifier = Modifier.height(8.dp))
