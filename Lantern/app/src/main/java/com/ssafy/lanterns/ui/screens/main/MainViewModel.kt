@@ -67,6 +67,7 @@ class MainViewModel @Inject constructor(
     val uiState: StateFlow<MainScreenUiState> = _uiState.asStateFlow()
 
 
+    private val _isEmergencyBroadcastingActive = MutableStateFlow(false)
 
 
     private val _aiActive = MutableStateFlow(false)
@@ -284,8 +285,13 @@ class MainViewModel @Inject constructor(
     // MainViewModel.kt
     // MainViewModel.kt
     fun triggerEmergencyBroadcast() {
-        Log.d(TAG, ">>> MainViewModel.triggerEmergencyBroadcast() 함수 요청됨 <<<") // 요청 시점 로그
-        viewModelScope.launch { // 함수 전체를 launch 블록으로 감싼다
+        Log.d(TAG, ">>> MainViewModel.triggerEmergencyBroadcast() 함수 요청됨 <<<")
+        viewModelScope.launch {
+            if (_isEmergencyBroadcastingActive.value) {
+                Log.w(TAG, "이미 긴급 방송이 활성화되어 있어 중복 요청 무시됨.")
+                return@launch
+            }
+
             Log.d(TAG, "triggerEmergencyBroadcast 코루틴 시작")
             var attempts = 0
             // isBleReady와 myServerUserId가 준비될 때까지 대기 (최대 3초)
@@ -298,36 +304,43 @@ class MainViewModel @Inject constructor(
             if (myServerUserId == -1L || !_uiState.value.isBleReady) {
                 Log.e(TAG, "긴급 광고 시작 불가 (최종 확인): 서버 ID ($myServerUserId) 또는 BLE 준비 안됨 (isBleReady=${_uiState.value.isBleReady})")
                 _uiState.update { it.copy(errorMessage = "긴급 호출을 전송할 수 없습니다. 초기화가 완료되지 않았거나 BLE 상태를 확인해주세요.") }
-                return@launch // 코루틴 종료
+                return@launch
             }
 
-            Log.i(TAG, "긴급 광고 요청됨 (MainViewModel 내부 - 최종): 사용자 ID=$myServerUserId, 닉네임='$myPreparedNicknameForAdv', Depth=$myCurrentAdvertisedDepth")
+            // --- 긴급 광고 시작 ---
+            _isEmergencyBroadcastingActive.value = true
+            Log.i(TAG, "긴급 광고 시작: 사용자 ID=$myServerUserId, 닉네임='$myPreparedNicknameForAdv', Depth=$myCurrentAdvertisedDepth")
 
-            // 핸들러 작업도 코루틴 내에서 안전하게 처리 (또는 withContext(Dispatchers.Main) 사용)
-            withContext(Dispatchers.Main) { // bleHandler 작업은 메인 스레드에서
+            // 기존 주기적 일반 광고 핸들러 중지
+            withContext(Dispatchers.Main) {
                 bleHandler.removeCallbacks(advertiseRunnable)
             }
+            Log.d(TAG, "기존 일반 광고 핸들러(advertiseRunnable) 제거됨.")
 
-            Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 직전 (Emergency=1)")
+            Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 (Emergency=1)")
             NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency = 1.toByte())
-            Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 완료 (Emergency=1)")
 
-            // 5초 후 일반 광고로 복귀 (이 launch는 이미 부모 launch 내에 있으므로 중첩 launch)
-            launch {
-                delay(5000L)
-                val isScanning = _uiState.value.isScanningActive
-                val isReady = _uiState.value.isBleReady
-                if (_uiState.value.isScanningActive && _uiState.value.isBleReady) {
+            val emergencyDuration = 10000L // 10초 (또는 원하는 시간으로 조절)
+            Log.d(TAG, "${emergencyDuration / 1000}초 동안 긴급 광고 유지 예정.")
+            delay(emergencyDuration)
 
-                    Log.d(TAG, "5초 후 상태: isScanningActive=$isScanning, isBleReady=$isReady")
-                    startOrUpdateAdvertising(isEmergency = 0.toByte())
-                } else {
-                    Log.w(TAG, "긴급 광고 시간 종료. 일반 광고 복귀 조건 미충족: 스캔 활성=$isScanning, BLE 준비=$isReady")
-                }
+            // --- 긴급 광고 종료 및 일반 광고로 복귀 또는 중단 ---
+            Log.i(TAG, "긴급 광고 시간(${emergencyDuration / 1000}초) 종료.")
+
+            val currentlyScanning = _uiState.value.isScanningActive
+            val currentlyBleReady = _uiState.value.isBleReady
+
+            if (currentlyScanning && currentlyBleReady) {
+                Log.d(TAG, "일반 광고로 복귀 시도. (스캔: $currentlyScanning, 준비: $currentlyBleReady)")
+                startOrUpdateAdvertising(isEmergency = 0.toByte()) // 일반 광고 시작 및 주기적 업데이트 재개
+            } else {
+                Log.w(TAG, "긴급 광고 종료 후 일반 광고 전환 조건 미충족. 광고 완전 중단 시도. (스캔: $currentlyScanning, 준비: $currentlyBleReady)")
+                NeighborAdvertiser.stopAdvertising()
+                Log.d(TAG, "NeighborAdvertiser.stopAdvertising() 호출로 모든 광고 명시적 중단.")
             }
+            _isEmergencyBroadcastingActive.value = false // 긴급 광고 상태 확실히 해제
         }
     }
-
 
     private val lastEmergencyNotificationTimestamps = mutableMapOf<String, Long>()
     private val EMERGENCY_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000L
