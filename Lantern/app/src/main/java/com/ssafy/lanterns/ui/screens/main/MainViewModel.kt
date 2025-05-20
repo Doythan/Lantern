@@ -129,18 +129,27 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun truncateNicknameForAdv(nickname: String): String {
-        val nicknameBytes = nickname.toByteArray(StandardCharsets.UTF_8)
-        if (nicknameBytes.size <= BleConstants.MAX_NICKNAME_BYTES_ADV) return nickname
-        var takenBytes = 0; var endIndex = 0
-        for (i in nickname.indices) {
-            val charAsStr = nickname.substring(i, i + 1)
-            val charBytesSize = charAsStr.toByteArray(StandardCharsets.UTF_8).size
-            if (takenBytes + charBytesSize <= BleConstants.MAX_NICKNAME_BYTES_ADV) {
-                takenBytes += charBytesSize; endIndex = i + 1
-            } else break
+    private fun truncateNicknameForAdv(nickname: String, maxBytes: Int = BleConstants.MAX_NICKNAME_BYTES_ADV): String {
+        val originalBytes = nickname.toByteArray(StandardCharsets.UTF_8)
+        if (originalBytes.size <= maxBytes) {
+            return nickname
         }
-        return nickname.substring(0, endIndex)
+
+        // maxBytes를 넘지 않는 가장 긴 부분 문자열 찾기
+        var endIndex = 0
+        var currentBytes = 0
+        for (i in nickname.indices) {
+            // 현재 문자를 바이트로 변환하여 크기 확인
+            val charAsBytes = nickname.substring(i, i + 1).toByteArray(StandardCharsets.UTF_8)
+            if (currentBytes + charAsBytes.size > maxBytes) {
+                break // 현재 문자를 추가하면 maxBytes를 초과하므로 여기서 중단
+            }
+            currentBytes += charAsBytes.size
+            endIndex = i + 1
+        }
+        val truncatedNickname = nickname.substring(0, endIndex)
+        Log.d(TAG, "닉네임 절단: 원본='$nickname'(${originalBytes.size}b) -> 절단본='$truncatedNickname'(${truncatedNickname.toByteArray(StandardCharsets.UTF_8).size}b), 최대 ${maxBytes}b")
+        return truncatedNickname
     }
 
     fun updateBlePermissionStatus(granted: Boolean) {
