@@ -19,7 +19,8 @@ val TextSecondary = Color(0xB3FFFFFF)     // Secondary text color (70% alpha whi
 val TextGray = Color(0xFF9E9E9E)          // Gray text color for specific cases
 val SurfaceDark = Color(0xFF0D1D3A)       // Surface color for cards, inputs, etc.
 val SurfaceLight = Color(0xFF1A2234)      // Lighter surface for specific components (e.g., CallHistory item)
-val ErrorRed = Color(0xFFFF5252)          // Error indication
+val ErrorRed = Color(0xFFFF5252)
+val BrightErrorRed = Color(0xFFFF5252)// Error indication
 val DisabledState = Color(0xFF666666)     // For disabled or inactive elements
 
 // --- Lantern Specific Colors ---
