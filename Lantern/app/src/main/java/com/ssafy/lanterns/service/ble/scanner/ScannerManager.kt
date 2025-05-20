@@ -20,18 +20,43 @@ import androidx.core.content.ContextCompat
 import com.ssafy.lanterns.R
 import com.ssafy.lanterns.service.ble.advertiser.AdvertiserManager
 import java.util.UUID
+import java.util.LinkedHashSet
 
 object ScannerManager {
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bluetoothLeScanner: BluetoothLeScanner? = null
     private var scanCallback: ScanCallback? = null
-    private val chatSet = mutableSetOf<String>() // <uuid, chat>
+    private val chatSet = LinkedHashSet<String>(500) // <uuid> - LinkedHashSet으로 변경하여 삽입 순서 유지, 용량 제한
 
     private val restartHandler = Handler(Looper.getMainLooper())
+    private val scanCycleHandler = Handler(Looper.getMainLooper())
+    private var isContinuousScanActive = false
+    private var activityRefForScan: Activity? = null
+    private var messageCallbackForScan: ((sender: String, text: String, isRelayed: Boolean) -> Unit)? = null
+
+    // 스캔 주기 상수 - 최적화된 값으로 다시 조정
+    private const val SCAN_HIGH_DUTY_DURATION_MS = 5000L  // 스캔 지속 시간 3초 (기존 3.5초)
+    private const val SCAN_HIGH_DUTY_PAUSE_MS = 100L      // 스캔 간 휴식 시간 0.1초 (기존 0.1초)
+    
+    // 채팅 세트 관리 상수
+    private const val MAX_CHAT_SET_SIZE = 500 // 최대 UUID 저장 개수
     private const val PREF_NAME = "ble_prefs"
     private const val KEY_CHAT_SET = "chat_uuids"
 
     private fun saveChatSet(context: Context) {
+        // 채팅 세트 크기 제한 처리
+        if (chatSet.size > MAX_CHAT_SET_SIZE) {
+            val overflow = chatSet.size - MAX_CHAT_SET_SIZE
+            // LinkedHashSet은 삽입 순서를 보존하므로 가장 오래된 것부터 제거
+            val iterator = chatSet.iterator()
+            var count = 0
+            while (iterator.hasNext() && count < overflow) {
+                iterator.next()
+                iterator.remove()
+                count++
+            }
+        }
+        
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         prefs.edit().putStringSet(KEY_CHAT_SET, chatSet).apply()
     }
@@ -42,6 +67,7 @@ object ScannerManager {
         if (savedSet != null) {
             chatSet.clear()
             chatSet.addAll(savedSet)
+            Log.d("ScannerManager", "채팅 세트 로드: ${chatSet.size}개 항목")
         }
     }
 
@@ -56,10 +82,16 @@ object ScannerManager {
         bluetoothAdapter = bluetoothManager?.adapter
         bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
         loadChatSet(activity)
-        Log.d("생성되나요?", "생성. BT Adapter: ${bluetoothAdapter != null}, Scanner: ${bluetoothLeScanner != null}")
+        Log.d("ScannerManager", "스캐너 초기화: BT Adapter: ${bluetoothAdapter != null}, Scanner: ${bluetoothLeScanner != null}")
     }
 
-    fun startScanning(activity: Activity, onMessageReceived: (String, String) -> Unit){
+    fun startScanning(activity: Activity, onMessageReceived: (sender: String, text: String, isRelayed: Boolean) -> Unit){
+        // 스캔 중이면 이전 스캔 중지
+        stopScanning(activity)
+        
+        this.activityRefForScan = activity
+        this.messageCallbackForScan = onMessageReceived
+        
         if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
             Log.e("BLE", "Bluetooth Adapter is null or not enabled. Cannot start scan.")
             return
@@ -73,7 +105,22 @@ object ScannerManager {
             }
         }
 
-        Log.d("스캔시작하냐?","채팅 스캔 시작 요청")
+        // 연속 스캔 시작
+        isContinuousScanActive = true
+        startScanInternalLogic()
+    }
+
+    // 내부 스캔 시작 로직 (주기적으로 호출됨)
+    private fun startScanInternalLogic() {
+        if (!isContinuousScanActive || activityRefForScan == null || messageCallbackForScan == null) {
+            Log.d("ScannerManager", "스캔 중단 상태: isContinuousScanActive=$isContinuousScanActive")
+            return
+        }
+        
+        val activity = activityRefForScan ?: return
+        val onMessageReceived = messageCallbackForScan ?: return
+
+        Log.d("ScannerManager","채팅 스캔 시작 (주기: ${SCAN_HIGH_DUTY_DURATION_MS}ms 스캔, ${SCAN_HIGH_DUTY_PAUSE_MS}ms 휴식)")
 
         // 제조사 ID - 랜턴 앱 전용 식별자 (0xFFFF, 0xFFFE 사용)
         val LANTERN_MANUFACTURER_ID_MESSAGE = 0xFFFF
@@ -92,6 +139,10 @@ object ScannerManager {
 
         val scanSettings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY) // 빠른 반응 모드
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES) // 모든 일치에 대해 콜백 받기
+            .setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE) // 적극적인 탐지 모드
+            .setNumOfMatches(ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT) // 최대 광고 매칭 횟수
+            .setReportDelay(0L) // 지연 없이 즉시 보고
             .build()
 
         scanCallback = object : ScanCallback() {
@@ -109,32 +160,61 @@ object ScannerManager {
                     val outerEmail = emailData?.let{
                         String(it)
                     }
-                    Log.d("ScannerTest", "Combined: ${combined}, EmailData: ${outerEmail}")
+                    // Log.d("ScannerTest", "Combined: ${combined}, EmailData: ${outerEmail}")
 
                     val emailText = outerEmail ?: "Unknown"
 
                     combined.let{
-                        val adParts = it.split("|", limit=2)
+                        // 새로운 TTL 형식 파싱 (UUID|TTL|메시지)
+                        val adParts = it.split("|", limit=3)
                         val scParts = outerEmail?.split("|", limit=2)
                         
-                        // 랜턴 앱의 메시지 형식 검증 (UUID|메시지 형식인지 확인)
-                        if(adParts.size == 2){
+                        // 새 형식 (UUID|TTL|메시지) 또는 구 형식 (UUID|메시지) 구분
+                        if(adParts.size >= 2){
                             val uuid = adParts[0]
-                            val admessage = adParts[1]
-                            val scannedSenderEmail = scParts?.getOrNull(0)
-                            val scmessage = scParts?.getOrNull(1)
-
+                            
                             // 검증: UUID가 올바른 형식인지 확인 (UUID 형식 검증)
                             if (!isValidUUID(uuid)) {
-                                Log.d("UUID검증", "유효하지 않은 UUID 형식: $uuid")
+                                Log.d("UUID검증", "유효하지 않은 UUID 형식: $uuid (길이: ${uuid.length})")
                                 return
                             }
 
                             // 이미 받은 uuid면
                             if(chatSet.contains(uuid)){
-                                Log.d("중복", "이미 수신한 메시지: $uuid")
+                                // Log.d("중복", "이미 수신한 메시지: $uuid")
                                 return
                             }
+                            
+                            // TTL과 메시지 추출
+                            var ttl = 0
+                            var admessage = ""
+                            var isRelayed = false
+                            
+                            if (adParts.size >= 3) {
+                                // 새 TTL 형식 (UUID|TTL|메시지)
+                                try {
+                                    ttl = adParts[1].toInt()
+                                } catch (e: NumberFormatException) {
+                                    // TTL 파싱 실패시 기본값 0 (더 이상 릴레이 안 함)
+                                    Log.d("TTL검증", "유효하지 않은 TTL 값: ${adParts[1]}")
+                                }
+                                admessage = adParts[2]
+                                isRelayed = ttl < 5 // 최초 발신 TTL이 5일 때, 5보다 작으면 릴레이된 메시지
+                            } else {
+                                // 구 형식 (UUID|메시지) - 하위 호환성 유지
+                                admessage = adParts[1]
+                                // 구 형식에서는 [R] 접두사로 릴레이 여부 파악
+                                if (admessage.startsWith("[R] ")) {
+                                    admessage = admessage.substring(4) // "[R] " 제거
+                                    isRelayed = true
+                                    ttl = 0 // 이미 한 번 릴레이됨, 더 이상 릴레이하지 않음
+                                } else {
+                                    ttl = 1 // 아직 릴레이되지 않음, 한 번만 릴레이
+                                }
+                            }
+                            
+                            val scannedSenderEmail = scParts?.getOrNull(0)
+                            val scmessage = scParts?.getOrNull(1)
                             
                             val fullMessage = if (scmessage != null) {
                                 admessage + scmessage
@@ -147,90 +227,107 @@ object ScannerManager {
                             saveChatSet(activity)
 
                             // 메시지 수신 콜백 호출
-                            Log.d("ScannerManager", "메시지 수신: 발신자=${scannedSenderEmail?:emailText}, 내용=$fullMessage")
-                            onMessageReceived(scannedSenderEmail ?: emailText, fullMessage)
+                            Log.d("ScannerManager", "메시지 수신: 발신자=${scannedSenderEmail?:emailText}, 내용='$fullMessage', 릴레이=$isRelayed, TTL=$ttl")
+                            onMessageReceived(scannedSenderEmail ?: emailText, fullMessage, isRelayed)
                             
-                            // 릴레이 코드 - 내가 받은 메시지를 다른 사용자에게 전달
-                            val safeCombined = combined
-                            val safeEmailForRelay = scannedSenderEmail ?: emailText
-                            val dataList = listOf(safeCombined, safeEmailForRelay)
-                            AdvertiserManager.startAdvertising(dataList, safeEmailForRelay, activity, 1)
+                            // TTL > 0일 때만 릴레이
+                            if (ttl > 0) {
+                                // 릴레이 코드 - 내가 받은 메시지를 다른 사용자에게 전달
+                                Log.d("ScannerManager", "메시지 릴레이: TTL=$ttl, UUID=$uuid")
+                                val relayDataList = listOf(combined, outerEmail ?: "Unknown") // 원본 combined 사용
+                                AdvertiserManager.startAdvertising(relayDataList, scannedSenderEmail ?: emailText, activity, 1)
+                            } else {
+                                Log.d("ScannerManager", "TTL=0으로 릴레이하지 않음: UUID=$uuid")
+                            }
                         }
                     }
-
-                    Log.d("주소", "${scanResult.device.address}")
                 }
-                Log.d("스캔성공", "스캔 성공")
             }
 
             override fun onScanFailed(errorCode: Int) {
                 super.onScanFailed(errorCode)
-                Log.e("스캔실패", "스캔 실패: $errorCode")
-                // 스캔 실패 시에도 1분 후 재시작 로직은 유지할 수 있음 (선택 사항)
-                // scheduleRestart(activity, onMessageReceived)
+                Log.e("ScannerManager", "스캔 실패: $errorCode")
             }
         }
 
         try {
-            // 권한 확인은 Activity 레벨에서 수행되었다고 가정합니다.
-            // 실제로는 여기서도 ContextCompat.checkSelfPermission(activity, Manifest.permission.BLUETOOTH_SCAN) 확인하는 것이 안전합니다.
-            bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
-            Log.i("ScannerManager", "채팅 스캔 시작됨.")
-        } catch (e: SecurityException){
-            Log.e("권한문제", "채팅 스캔 시작 중 SecurityException: ${e.message}")
-        } catch (e: IllegalStateException) {
-            Log.e("BLE", "채팅 스캔 시작 중 IllegalStateException (Adapter off?): ${e.message}")
-        }
-
-        // ✅ 여기에 1분마다 반복적으로 재시작 루프를 등록합니다.
-        scheduleRestart(activity, onMessageReceived)
-    }
-
-    private fun scheduleRestart(activity: Activity, onMessageReceived: (String, String) -> Unit) {
-        restartHandler.postDelayed(object : Runnable {
-            override fun run() {
-                Log.d("주기적으로", "🔄 채팅 스캔 주기적 재시작")
-                startScanning(activity, onMessageReceived)
+            // 권한 확인
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (ContextCompat.checkSelfPermission(activity, android.Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                    Log.e("ScannerManager", "BLUETOOTH_SCAN 권한이 없습니다. 스캔을 시작할 수 없습니다.")
+                    return
+                }
             }
-        }, 1 * 60 * 1000) // 1분마다
-    }
-
-    fun stopScanning(activity: Activity){ // Activity context 추가
-        Log.i("ScannerManager", "채팅 스캔 중지 요청")
-        if (bluetoothLeScanner == null) {
-            Log.w("ScannerManager", "BluetoothLeScanner is null, cannot stop scan.")
-            return
+            
+            bluetoothLeScanner?.startScan(scanFilters, scanSettings, scanCallback)
+            
+            
+            // 지정된 시간 후에 스캔 일시 중지
+            scanCycleHandler.postDelayed({
+                stopCurrentScanSession()
+                
+                // 짧은 휴식 후 다시 스캔 시작
+                scanCycleHandler.postDelayed({
+                    if (isContinuousScanActive) {
+                        startScanInternalLogic() // 스캔 다시 시작
+                    }
+                }, SCAN_HIGH_DUTY_PAUSE_MS)
+            }, SCAN_HIGH_DUTY_DURATION_MS)
+            
+        } catch (e: SecurityException){
+            Log.e("ScannerManager", "채팅 스캔 시작 중 SecurityException: ${e.message}")
+        } catch (e: IllegalStateException) {
+            Log.e("ScannerManager", "채팅 스캔 시작 중 IllegalStateException (Adapter off?): ${e.message}")
         }
+    }
+    
+    // 현재 진행 중인 스캔 세션만 중지 (전체 스캔 사이클은 계속)
+    private fun stopCurrentScanSession() {
+        val activity = activityRefForScan ?: return
+        
         scanCallback?.let{ cb ->
             try{
-                // BLUETOOTH_SCAN 권한 확인 (Android 12+)
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
                     if (ContextCompat.checkSelfPermission(activity, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                         bluetoothLeScanner?.stopScan(cb)
-                        Log.i("ScannerManager", "채팅 스캔 중지됨 (Android 12+).")
+                        Log.i("ScannerManager", "채팅 스캔 일시 중지됨.")
                     } else {
-                        Log.e("ScannerManager", "BLUETOOTH_SCAN permission not granted for stopping scan on Android 12+.")
+                        Log.e("ScannerManager", "BLUETOOTH_SCAN 권한이 없습니다. 스캔을 중지할 수 없습니다.")
                     }
                 } else {
-                    // Android 11 이하에서는 BLUETOOTH_ADMIN 권한 필요 (매니페스트에 이미 선언되어 있다고 가정)
-                    // 또는 별도 권한 없이도 stopScan 가능할 수 있음
                     bluetoothLeScanner?.stopScan(cb)
-                    Log.i("ScannerManager", "채팅 스캔 중지됨 (Android 11 이하).")
+                    Log.i("ScannerManager", "채팅 스캔 일시 중지됨.")
                 }
             } catch (e : SecurityException){
-                Log.e("권한문제염", "채팅 스캔 중지 중 SecurityException: ${e.message}")
+                Log.e("ScannerManager", "채팅 스캔 중지 중 SecurityException: ${e.message}")
             } catch (e: IllegalStateException) {
-                Log.e("BLE", "채팅 스캔 중지 중 IllegalStateException (Adapter off?): ${e.message}")
+                Log.e("ScannerManager", "채팅 스캔 중지 중 IllegalStateException (Adapter off?): ${e.message}")
             }
         }
-        scanCallback = null // 콜백 참조 제거
-        restartHandler.removeCallbacksAndMessages(null) // 예약된 재시작 작업도 모두 제거
-        Log.i("ScannerManager", "채팅 스캔 중지 완료 및 재시작 핸들러 제거됨.")
+        scanCallback = null
+    }
+
+    fun stopScanning(activity: Activity){
+        Log.i("ScannerManager", "채팅 스캔 중지 요청")
+        
+        // 스캔 루프 중지
+        isContinuousScanActive = false
+        scanCycleHandler.removeCallbacksAndMessages(null)
+        restartHandler.removeCallbacksAndMessages(null)
+        
+        // 현재 진행 중인 스캔 세션 중지
+        stopCurrentScanSession()
+        
+        // 콜백 참조 정리
+        activityRefForScan = null
+        messageCallbackForScan = null
+        
+        Log.i("ScannerManager", "채팅 스캔 중지 완료 및 핸들러 제거됨.")
     }
 
     // UUID 유효성 검사 함수
     private fun isValidUUID(uuid: String): Boolean {
-        // 간단한 UUID 형식 검사 (8자리 16진수)
-        return uuid.length == 8 && uuid.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
+        // UUID 형식 검사를 6자리로 변경
+        return uuid.length == 6 && uuid.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }
     }
 }
