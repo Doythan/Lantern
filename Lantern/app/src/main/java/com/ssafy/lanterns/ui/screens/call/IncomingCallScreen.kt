@@ -8,15 +8,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lanterns.ui.theme.*
@@ -25,21 +23,22 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
+import androidx.hilt.navigation.compose.hiltViewModel
 
-/**
- * 전화 수신 화면
- */
 @Composable
 fun IncomingCallScreen(
     callerName: String,
     callerId: Int = 1,
     onRejectClick: () -> Unit,
-    onAcceptClick: () -> Unit
+    onAcceptClick: () -> Unit,
+    callViewModel: CallViewModel = hiltViewModel()
 ) {
+    val uiState by callViewModel.uiState.collectAsState()
+
     // 시스템 바 패딩 계산
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
     val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues()
-    
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -77,9 +76,9 @@ fun IncomingCallScreen(
                             .clip(CircleShape)
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 // 발신자 이름
                 Text(
                     text = callerName,
@@ -87,9 +86,9 @@ fun IncomingCallScreen(
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // "전화가 왔습니다" 텍스트
                 Text(
                     text = "전화가 왔습니다",
@@ -97,7 +96,7 @@ fun IncomingCallScreen(
                     fontSize = 18.sp
                 )
             }
-            
+
             // 하단 버튼 영역 (내비게이션 바 고려)
             Row(
                 modifier = Modifier
@@ -125,16 +124,16 @@ fun IncomingCallScreen(
                             modifier = Modifier.size(32.dp)
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Text(
                         text = "거절",
                         color = MaterialTheme.colorScheme.onBackground,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
-                
+
                 // 수락 버튼
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -155,9 +154,9 @@ fun IncomingCallScreen(
                             modifier = Modifier.size(32.dp)
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    
+
                     Text(
                         text = "수락",
                         color = MaterialTheme.colorScheme.onBackground,
@@ -166,18 +165,19 @@ fun IncomingCallScreen(
                 }
             }
         }
-    }
-}
 
-@Preview(showBackground = true)
-@Composable
-fun IncomingCallScreenPreview() {
-    LanternsTheme {
-        IncomingCallScreen(
-            callerName = "김민수",
-            callerId = 2,
-            onRejectClick = {},
-            onAcceptClick = {}
-        )
+        // 오류 메시지 표시
+        if (uiState.errorMessage != null) {
+            AlertDialog(
+                onDismissRequest = { callViewModel.clearErrorMessage() },
+                title = { Text("통화 오류") },
+                text = { Text(uiState.errorMessage!!) },
+                confirmButton = {
+                    Button(onClick = { callViewModel.clearErrorMessage() }) {
+                        Text("확인")
+                    }
+                }
+            )
+        }
     }
 }

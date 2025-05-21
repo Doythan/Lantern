@@ -1,18 +1,23 @@
-// main/java/com/ssafy/lanterns/MyApp.kt
 package com.ssafy.lanterns
 
 import android.app.Application
 import android.content.Intent
 import android.os.Build
-import android.util.Log // Log 사용을 위해 추가
+import android.util.Log
 import androidx.room.Room
 import com.ssafy.lanterns.data.database.AppDatabase
+import com.ssafy.lanterns.data.source.ble.BleManager
 import com.ssafy.lanterns.service.WakeWordService
-import com.ssafy.lanterns.utils.WakeWordUtils // WakeWordUtils 임포트
+import com.ssafy.lanterns.utils.WakeWordUtils
 import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
 
 @HiltAndroidApp
 class MyApp : Application() {
+    // BleManager 의존성 주입
+    @Inject
+    lateinit var bleManager: BleManager
+
     val db: AppDatabase by lazy {
         Room.databaseBuilder(
             this,
@@ -25,6 +30,15 @@ class MyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+
+        // BLE 서비스 초기화 - 권한 체크는 BleManager 내부에서 수행
+        try {
+            bleManager.initialize()
+            Log.d("MyApp", "BLE 서비스 초기화 완료")
+        } catch (e: Exception) {
+            Log.e("MyApp", "BLE 서비스 초기화 실패: ${e.message}")
+        }
+
         // WakeWord 모델 파일 존재 여부 확인
         if (WakeWordUtils.hasModelFiles(this)) {
             Intent(this, WakeWordService::class.java).also { intent ->

@@ -16,11 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ssafy.lanterns.ui.theme.*
@@ -29,17 +27,31 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
+import android.util.Log
 
-/**
- * 전화 거는 중 화면
- */
 @Composable
 fun OutgoingCallScreen(
     receiverName: String,
     receiverId: Int = 1,
-    onCancelClick: () -> Unit
+    onCancelClick: () -> Unit,
+    // 여기가 중요한 변경점: 기본값 제거
+    callViewModel: CallViewModel
 ) {
+    val uiState by callViewModel.uiState.collectAsState()
+
+    // 디버깅용 로그 추가
+    DisposableEffect(Unit) {
+        Log.d("OutgoingCallScreen", "화면 시작 - 사용 중인 callViewModel: $callViewModel")
+        onDispose {
+            Log.d("OutgoingCallScreen", "화면 종료")
+        }
+    }
+
+    // callState 변경 감지용 LaunchedEffect 추가
+    LaunchedEffect(uiState.callState) {
+        Log.d("OutgoingCallScreen", "상태 변경 감지: ${uiState.callState}")
+    }
+
     // 전화 걸고 있음 애니메이션을 위한 알파값
     val infiniteTransition = rememberInfiniteTransition(label = "calling_animation")
     val alpha by infiniteTransition.animateFloat(
@@ -50,11 +62,11 @@ fun OutgoingCallScreen(
         ),
         label = "alpha_animation"
     )
-    
+
     // 시스템 바 패딩 계산
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
     val navigationBarPadding = WindowInsets.navigationBars.asPaddingValues()
-    
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -73,7 +85,7 @@ fun OutgoingCallScreen(
         ) {
             // 상단 여백
             Spacer(modifier = Modifier.height(32.dp))
-            
+
             // 프로필 이미지
             Box(
                 modifier = Modifier
@@ -90,7 +102,7 @@ fun OutgoingCallScreen(
                         .clip(CircleShape)
                 )
             }
-            
+
             // 수신자 정보 영역
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -102,9 +114,9 @@ fun OutgoingCallScreen(
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // "통화 거는 중..." 텍스트 (깜빡이는 효과)
                 Text(
                     text = "통화 거는 중...",
@@ -113,7 +125,7 @@ fun OutgoingCallScreen(
                     modifier = Modifier.alpha(alpha)
                 )
             }
-            
+
             // 하단 버튼 영역 (하단 내비게이션 바 고려)
             Box(
                 modifier = Modifier
@@ -138,17 +150,19 @@ fun OutgoingCallScreen(
                 }
             }
         }
+
+        // 오류 메시지 표시
+        if (uiState.errorMessage != null) {
+            AlertDialog(
+                onDismissRequest = { callViewModel.clearErrorMessage() },
+                title = { Text("통화 오류") },
+                text = { Text(uiState.errorMessage!!) },
+                confirmButton = {
+                    Button(onClick = { callViewModel.clearErrorMessage() }) {
+                        Text("확인")
+                    }
+                }
+            )
+        }
     }
 }
-
-@Preview(showBackground = true)
-@Composable
-fun OutgoingCallScreenPreview() {
-    LanternsTheme {
-        OutgoingCallScreen(
-            receiverName = "김민수",
-            receiverId = 2,
-            onCancelClick = {}
-        )
-    }
-} 
