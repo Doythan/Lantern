@@ -190,152 +190,124 @@ fun PersonListItemWithButtons(
     val connectionColor = getConnectionColorBySignalLevel(person.signalLevel)
     val connectionText = getConnectionStrengthTextFromSignalLevel(person.signalLevel)
     
-    // 통화 버튼은 신호 강도가 가장 강한 경우(Level 3)에만 활성화
-    val isCallEnabled = person.signalLevel >= 3
+    // 통화 버튼은 항상 활성화 (조건 제거)
+    val isCallEnabled = true
     
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        // 조건에 따른 색상 설정으로 신호 강도 시각적 표현
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
         )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // 왼쪽: 프로필 이미지와 사용자 정보
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // 프로필 아이콘 (신호 강도에 따른 테두리 색상)
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(2.dp, connectionColor, CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                // 아바타 이미지 - 신호 강도에 따라 테두리 색상 변경
-                Box(
-                    modifier = Modifier
-                        .size(50.dp)
-                        .clip(CircleShape)
-                        .background(
-                            brush = Brush.linearGradient(
-                                colors = listOf(
-                                    BleBlue1,
-                                    BleBlue2
-                                )
-                            )
-                        )
-                        .border(width = 2.dp, color = connectionColor.copy(alpha = 0.7f), shape = CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = rememberVectorPainter(Icons.Default.Person),
-                        contentDescription = "프로필 이미지",
-                        modifier = Modifier
-                            .size(30.dp)
-                            .alpha(0.9f),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = "프로필",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            // 정보 영역 (닉네임, 연결 강도)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp)
+            ) {
+                Text(
+                    text = person.nickname,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 
-                // 사용자 정보
-                Column {
-                    Text(
-                        text = person.nickname, // nickname 사용
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 신호 강도 표시 (색상으로 구분)
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(connectionColor)
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
                     
-                    // 연결 정보 (홉수 및 신호 강도)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // 홉수 표시
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(20.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "${person.calculatedVisualDepth}홉",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                        
-                        // 신호 강도 표시
-                        Box(
-                            modifier = Modifier
-                                .background(
-                                    color = connectionColor.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(20.dp)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = connectionText,
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = connectionColor
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    
+                    Text(
+                        text = connectionText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Text(
+                        text = "신호: ${person.rssi} dBm",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
             
-            // 오른쪽: 채팅 및 통화 버튼
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // 채팅 버튼 (항상 활성화)
+            IconButton(
+                onClick = onChatClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                    )
             ) {
-                // 채팅 버튼
-                IconButton(
-                    onClick = onChatClick,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            color = LanternYellow
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Chat,
-                        contentDescription = "채팅하기",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                Icon(
+                    imageVector = Icons.Default.Chat,
+                    contentDescription = "채팅",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(8.dp))
+            
+            // 통화 버튼 (항상 활성화)
+            IconButton(
+                onClick = onCallClick,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                     )
-                }
-                
-                // 통화 버튼 (신호 강도 Level 3일 때만 활성화)
-                IconButton(
-                    onClick = onCallClick,
-                    enabled = isCallEnabled,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isCallEnabled) BleAccent 
-                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-                        )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Call,
-                        contentDescription = "전화걸기",
-                        tint = if (isCallEnabled) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Call,
+                    contentDescription = "통화",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

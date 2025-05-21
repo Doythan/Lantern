@@ -50,12 +50,12 @@ object NeighborAdvertiser {
         if (bluetoothLeAdvertiser == null) Log.e(TAG, "BLE Advertiser 초기화 실패 (또는 지원 안함)")
     }
 
-    fun startAdvertising(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte = 0) {
+    fun startAdvertising(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte = 0, profileImageNumber: Int = 0) {
         val activity = currentActivityRef?.get() ?: run { 
             Log.e(TAG, "Activity null, 광고 불가")
             return
         }
-        Log.i(TAG, "광고 시작 요청: sID=$serverUserId, Nick='$processedNickname', MyDepth=$currentOwnAdvertisedDepth, Emergency=$isEmergency")
+        Log.i(TAG, "광고 시작 요청: sID=$serverUserId, Nick='$processedNickname', MyDepth=$currentOwnAdvertisedDepth, Emergency=$isEmergency, ProfileImage=$profileImageNumber")
         
         val advertiser = bluetoothLeAdvertiser ?: run { 
             Log.e(TAG, "Advertiser null, 광고 불가")
@@ -79,7 +79,7 @@ object NeighborAdvertiser {
             .setTimeout(0) // 타임아웃 없음 (계속 광고)
             .build()
 
-        val lanternPacket = buildLanternPacket(serverUserId, processedNickname, currentOwnAdvertisedDepth, isEmergency)
+        val lanternPacket = buildLanternPacket(serverUserId, processedNickname, currentOwnAdvertisedDepth, isEmergency, profileImageNumber)
         if (lanternPacket == null) { 
             Log.e(TAG, "패킷 생성 실패") 
             return 
@@ -134,7 +134,7 @@ object NeighborAdvertiser {
                     
                     pendingRetryRunnable = Runnable {
                         if (!isCurrentlyAdvertising) {
-                            startAdvertising(serverUserId, processedNickname, currentOwnAdvertisedDepth)
+                            startAdvertising(serverUserId, processedNickname, currentOwnAdvertisedDepth, isEmergency, profileImageNumber)
                         }
                     }.also {
                         handler.postDelayed(it, retryDelay)
@@ -193,13 +193,13 @@ object NeighborAdvertiser {
         cancelPendingRetry()
     }
 
-    private fun buildLanternPacket(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte): ByteArray? {
+    private fun buildLanternPacket(serverUserId: Long, processedNickname: String, currentOwnAdvertisedDepth: Int, isEmergency: Byte, profileImageNumber: Int = 0): ByteArray? {
         try {
             val userIdInt = serverUserId.toInt() // Long -> Int (값 범위 고려, 필요시 서버 ID 정책 변경)
             val nicknameBytes = processedNickname.toByteArray(StandardCharsets.UTF_8, ) // 이미 길이 처리된 닉네임
 
-            // 패킷 구성: (1)데이터타입 + (1)버전 + (4)서버ID + (1)Depth + (1)닉네임길이 + (n)닉네임 + (1)긴급플래그
-            val packetSize = 1 + 1 + BleConstants.SERVER_USER_ID_BYTES + BleConstants.DEPTH_BYTES + 1 + nicknameBytes.size + 1
+            // 패킷 구성: (1)데이터타입 + (1)버전 + (4)서버ID + (1)Depth + (1)닉네임길이 + (n)닉네임 + (1)긴급플래그 + (1)프로필이미지번호
+            val packetSize = 1 + 1 + BleConstants.SERVER_USER_ID_BYTES + BleConstants.DEPTH_BYTES + 1 + nicknameBytes.size + 1 + 1
             if (packetSize > 31) { // BLE 페이로드 최대 크기 엄격하게 체크 (헤더 등 제외하면 더 작음)
                 Log.e(TAG, "최종 패킷 크기($packetSize)가 BLE 광고 제한(31바이트)을 초과합니다.")
                 return null // 너무 크면 null 반환
@@ -214,7 +214,8 @@ object NeighborAdvertiser {
                       "depth=$currentOwnAdvertisedDepth, " +
                       "nameLen=${nicknameBytes.size}, " +
                         "name='$processedNickname', " +
-                        "emergency=$isEmergency"
+                        "emergency=$isEmergency, " +
+                        "profileImg=$profileImageNumber"
                 )
             }
                   
@@ -227,6 +228,7 @@ object NeighborAdvertiser {
             buffer.put(nicknameBytes.size.toByte())
             buffer.put(nicknameBytes)
             buffer.put(isEmergency)
+            buffer.put(profileImageNumber.toByte()) // 프로필 이미지 번호 추가 (0-255 범위)
 
             return buffer.array()
         } catch (e: Exception) {
