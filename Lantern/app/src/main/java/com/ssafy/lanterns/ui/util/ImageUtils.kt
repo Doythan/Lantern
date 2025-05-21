@@ -3,7 +3,7 @@ package com.ssafy.lanterns.ui.util
 import androidx.annotation.DrawableRes
 import com.ssafy.lanterns.R
 
-// 이미지 번호(1-15)를 직접 받아 해당 Drawable Resource ID를 반환합니다.
+// 이미지 번호(1-6)를 직접 받아 해당 Drawable Resource ID를 반환합니다.
 // 유효하지 않은 번호가 입력될 경우 기본 이미지를 반환합니다.
 @DrawableRes
 fun getProfileImageByNumber(imageNumber: Int): Int {
@@ -14,16 +14,7 @@ fun getProfileImageByNumber(imageNumber: Int): Int {
         4 -> R.drawable.profile_4
         5 -> R.drawable.profile_5
         6 -> R.drawable.profile_6
-        7 -> R.drawable.profile_7
-        8 -> R.drawable.profile_8
-        9 -> R.drawable.profile_9
-        10 -> R.drawable.profile_10
-        11 -> R.drawable.profile_11
-        12 -> R.drawable.profile_12
-        13 -> R.drawable.profile_13
-        14 -> R.drawable.profile_14
-        15 -> R.drawable.profile_15
-        else -> R.drawable.lantern_image // 기본 또는 fallback 이미지
+        else -> R.drawable.profile_1 // 기본 이미지는 profile_1으로 설정
     }
 }
 
@@ -36,7 +27,7 @@ fun getDefaultProfileImageNumber(): Int {
 // 프로필 이미지 선택 UI 등에 사용될 수 있도록
 // 모든 프로필 이미지의 번호와 리소스 ID 쌍을 Map 형태로 반환합니다.
 fun getAllProfileImageResources(): Map<Int, Int> {
-    return (1..15).associateWith { getProfileImageByNumber(it) }
+    return (1..6).associateWith { getProfileImageByNumber(it) }
 }
 
 // 기존 getProfileImageResId 함수는 ID의 의미가 모호하고,
@@ -51,7 +42,7 @@ import com.ssafy.lanterns.data.model.User // User 모델 import 필요
 fun getEffectiveProfileImageRes(user: User): Int {
     // User 모델에 selectedProfileImageNumber: Int? 필드가 있다고 가정 (null은 선택 안 함)
     val selectedNumber = user.selectedProfileImageNumber
-    return if (selectedNumber != null && selectedNumber in 1..15) {
+    return if (selectedNumber != null && selectedNumber in 1..6) {
         getProfileImageByNumber(selectedNumber)
     } else {
         // 선택된 이미지가 없으면 기본 이미지 (1번) 사용
@@ -61,7 +52,7 @@ fun getEffectiveProfileImageRes(user: User): Int {
 */
 
 // Helper function to get drawable resource ID based on user/chat ID
-// Assumes profile images are named profile_1.png to profile_15.png in res/drawable/
+// Assumes profile images are named profile_1.png to profile_6.png in res/drawable/
 // !! 주의: 이 함수는 getDefaultProfileImageNumber() 와 역할이 중복될 수 있으며,
 // !! User.selectedProfileImageNumber 와 함께 사용하는 getEffectiveProfileImageRes 와 같은
 // !! 명확한 함수로 대체하는 것을 권장합니다.
@@ -70,24 +61,7 @@ fun getProfileImageResId(id: Int): Int {
     if (id == -1) {
         return R.drawable.public_1 // 확성기 아이콘 (모두의 광장)
     }
-    // Ensure imageNumber is within 1-15 range using modulo
-    val imageNumber = (id - 1) % 15 + 1
-    return when (imageNumber) {
-        1 -> R.drawable.profile_1
-        2 -> R.drawable.profile_2
-        3 -> R.drawable.profile_3
-        4 -> R.drawable.profile_4
-        5 -> R.drawable.profile_5
-        6 -> R.drawable.profile_6
-        7 -> R.drawable.profile_7
-        8 -> R.drawable.profile_8
-        9 -> R.drawable.profile_9
-        10 -> R.drawable.profile_10
-        11 -> R.drawable.profile_11
-        12 -> R.drawable.profile_12
-        13 -> R.drawable.profile_13
-        14 -> R.drawable.profile_14
-        15 -> R.drawable.profile_15
-        else -> R.drawable.lantern_image // Fallback image
-    }
+    // Ensure imageNumber is within 1-6 range using modulo
+    val imageNumber = (id - 1) % 6 + 1
+    return getProfileImageByNumber(imageNumber)
 } 

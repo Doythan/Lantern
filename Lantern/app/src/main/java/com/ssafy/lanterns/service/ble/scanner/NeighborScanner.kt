@@ -51,14 +51,16 @@ object NeighborScanner {
         var rssi: Int,
         var lastSeen: Long,
         val bleAddress: String,
-        var isEmergency: Byte = 0
+        var isEmergency: Byte = 0,
+        var profileImageNumber: Int = 0 // 프로필 이미지 번호 추가
     )
 
     private data class ParsedAdPacket(
         val serverUserId: Long,
         val advertisedOwnDepth: Int,
         val nickname: String,
-        val isEmergency: Byte
+        val isEmergency: Byte,
+        val profileImageNumber: Int = 0 // 프로필 이미지 번호 추가
     )
 
     fun init(activity: Activity) {
@@ -219,6 +221,12 @@ object NeighborScanner {
                                 return@let
                             }
                             
+                            if (parsed.nickname == "ErrorParse") {
+                                // ErrorParse 기기는 맵에 추가하지 않음
+                                Log.d(TAG, "ErrorParse 기기 감지됨 - 맵에 추가하지 않음")
+                                return@let
+                            }
+                            
                             scannedDevicesMap.compute(device.address) { _, existing ->
                                 val newData = existing?.copy(
                                     serverUserId = parsed.serverUserId,
@@ -226,7 +234,8 @@ object NeighborScanner {
                                     advertisedOwnDepth = parsed.advertisedOwnDepth,
                                     rssi = scanResult.rssi,
                                     lastSeen = System.currentTimeMillis(),
-                                    isEmergency = parsed.isEmergency
+                                    isEmergency = parsed.isEmergency,
+                                    profileImageNumber = parsed.profileImageNumber // 프로필 이미지 번호 추가
                                 ) ?: ScannedDeviceData(
                                     serverUserId = parsed.serverUserId,
                                     nickname = parsed.nickname,
@@ -234,10 +243,11 @@ object NeighborScanner {
                                     rssi = scanResult.rssi,
                                     lastSeen = System.currentTimeMillis(),
                                     bleAddress = device.address,
-                                    isEmergency = parsed.isEmergency
+                                    isEmergency = parsed.isEmergency,
+                                    profileImageNumber = parsed.profileImageNumber // 프로필 이미지 번호 추가
                                 )
                                 if (existing == null) {
-                                    Log.i(TAG, "새 기기 '${parsed.nickname}'(${parsed.serverUserId}) 발견됨. 주소: ${device.address}")
+                                    Log.i(TAG, "새 기기 '${parsed.nickname}'(${parsed.serverUserId}) 발견됨. 주소: ${device.address}, 프로필 이미지: ${parsed.profileImageNumber}")
                                 }
                                 newData
                             }
@@ -448,7 +458,7 @@ object NeighborScanner {
                     }
                 }
                 // #이 없는 경우는 닉네임만 있다고 가정
-                return ParsedAdPacket(serverId, 0, nickname, 0.toByte())
+                return ParsedAdPacket(serverId, 0, nickname, 0.toByte(), 0) // 이전 형식에서는 프로필 이미지 번호를 0으로 설정
             }
             
             // 현재 앱 형식 처리
@@ -473,13 +483,12 @@ object NeighborScanner {
             val advertisedOwnDepth = buffer.get().toInt() and 0xFF
 
 
-            if (buffer.remaining() < 1) throw IllegalArgumentException("긴급 플래그 읽기 위한 버퍼 부족 (1 byte)")
+            if (buffer.remaining() < 1) throw IllegalArgumentException("닉네임 길이 읽기 위한 버퍼 부족 (1 byte)")
             val nicknameLength = buffer.get().toInt() and 0xFF
 
             if (nicknameLength > BleConstants.MAX_NICKNAME_BYTES_ADV) { // 0도 유효한 길이 (닉네임 없음)
                 throw IllegalArgumentException("잘못된 Nickname 길이: $nicknameLength. 허용 범위: 0-${BleConstants.MAX_NICKNAME_BYTES_ADV}")
             }
-
 
             val nickname = if (nicknameLength > 0) {
                 if (buffer.remaining() < nicknameLength) {
@@ -494,14 +503,23 @@ object NeighborScanner {
                 throw IllegalArgumentException("긴급 플래그 읽기 위한 버퍼 부족 (1 byte)")
             }
             val isEmergencyFlag = buffer.get()
-            Log.d(TAG, "Parsed Packet: sID=$serverUserId, Nick='$nickname', Depth=$advertisedOwnDepth, Emergency=$isEmergencyFlag")
+            
+            // 프로필 이미지 번호 읽기 (남은 버퍼가 있는 경우에만)
+            val profileImageNumber = if (buffer.remaining() >= 1) {
+                buffer.get().toInt() and 0xFF
+            } else {
+                0 // 기본값 (이전 버전 호환성)
+            }
+            
+            Log.d(TAG, "Parsed Packet: sID=$serverUserId, Nick='$nickname', Depth=$advertisedOwnDepth, Emergency=$isEmergencyFlag, ProfileImg=$profileImageNumber")
 
-            return ParsedAdPacket(serverUserId, advertisedOwnDepth, nickname, isEmergencyFlag)
+            return ParsedAdPacket(serverUserId, advertisedOwnDepth, nickname, isEmergencyFlag, profileImageNumber)
         } catch (e: Exception) {
             // 예외 발생 시 원본 데이터 로깅
             val dataHex = data.joinToString(" ") { String.format("%02X", it) }
             Log.e(TAG, "패킷 파싱 중 예외: ${e.message}, 원본 데이터: $dataHex", e)
-            return ParsedAdPacket(0L, 0, "ErrorParse", 0.toByte())
+            // errorparse(에러파스찾았다요놈)
+            return ParsedAdPacket(0L, 0, "ErrorParse", 0.toByte(), 0)
         }
     }
 

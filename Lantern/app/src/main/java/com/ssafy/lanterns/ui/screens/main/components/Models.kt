@@ -13,7 +13,8 @@ data class NearbyPerson(
     val rssi: Int,                  // 스캔 시 수신된 (필터링된) RSSI
     val signalLevel: Int,           // 계산된 신호 강도 레벨 (1:약함, 2:중간, 3:강함)
     val angle: Float,               // UI 표시용 랜덤 각도 (serverUserIdString 기반)
-    val lastSeenTimestamp: Long     // 마지막으로 발견된 시간 (업데이트용)
+    val lastSeenTimestamp: Long,    // 마지막으로 발견된 시간 (업데이트용)
+    val profileImageNumber: Int = 0  // 프로필 이미지 번호 (0이면 서버ID 기반으로 랜덤 결정)
 )
 
 /**
@@ -21,7 +22,6 @@ data class NearbyPerson(
  */
 data class AnimationValues(
     val buttonScale: Float,
-    val buttonGlowAlpha: Float,
     val radarAngle: Float,
     val dotPulseScale: Float,
     val dotGlowAlpha: Float

@@ -58,7 +58,9 @@ data class MainScreenUiState(
     val currentEmergencyPacketTimestamp: Long = 0L,
     val rescueRequestReceived: Boolean = false,
     val rescueRequesterNickname: String? = null,
-
+    val showProfileModal: Boolean = false,
+    val selectedProfilePerson: NearbyPerson? = null,
+    val userProfileImageNumber: Int = 1 // 사용자 프로필 이미지 번호 (기본값 1)
 )
 
 @HiltViewModel
@@ -89,6 +91,9 @@ class MainViewModel @Inject constructor(
     private val advertiseRunnable: Runnable = Runnable { startOrUpdateAdvertising(isEmergency = 0.toByte()) }
     private var activityRef: WeakReference<Activity>? = null
 
+    private val lastUIUpdatedTimestamps = mutableMapOf<String, Long>() // 마지막 UI 업데이트 시간 저장
+    // 최적화된 UI 업데이트 간격 (1초)
+    private val UI_UPDATE_INTERVAL_SHORT_MS = 10000L 
 
     init {
         Log.d(TAG, "MainViewModel init 시작")
@@ -124,8 +129,16 @@ class MainViewModel @Inject constructor(
                 myServerUserId = currentUser.userId
                 myNickname = currentUser.nickname.ifBlank { "랜턴_${currentUser.userId.toString().takeLast(3)}" }
                 myPreparedNicknameForAdv = truncateNicknameForAdv(myNickname)
-                Log.i(TAG, "사용자 정보 로드: sID=$myServerUserId, Nick='$myNickname', MyAdvDepth=$myCurrentAdvertisedDepth")
-                _uiState.update { it.copy(currentSelfAdvertisedDepth = myCurrentAdvertisedDepth, isLoading = false) }
+                
+                // 사용자 프로필 이미지 번호 로드
+                val profileImageNumber = currentUser.selectedProfileImageNumber
+                
+                Log.i(TAG, "사용자 정보 로드: sID=$myServerUserId, Nick='$myNickname', ProfileImg=$profileImageNumber, MyAdvDepth=$myCurrentAdvertisedDepth")
+                _uiState.update { it.copy(
+                    currentSelfAdvertisedDepth = myCurrentAdvertisedDepth, 
+                    userProfileImageNumber = profileImageNumber, 
+                    isLoading = false
+                ) }
             } else {
                 _uiState.update { it.copy(errorMessage = "로그인 정보가 유효하지 않습니다. 탐색을 시작할 수 없습니다.", isLoading = false) }
                 Log.w(TAG, "유효한 사용자 정보 없음. currentUser: $currentUser")
@@ -312,7 +325,10 @@ class MainViewModel @Inject constructor(
     private fun startOrUpdateAdvertising(isEmergency: Byte = 0.toByte()) {
         if (myServerUserId == -1L || !_uiState.value.isBleReady) return
 
-        NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency)
+        // 프로필 이미지 번호 추가하여 전달
+        val profileImageNumber = _uiState.value.userProfileImageNumber
+        NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency, profileImageNumber)
+        
         if (isEmergency == 0.toByte()) {
             bleHandler.removeCallbacks(advertiseRunnable) // 이전 예약이 있다면 취소
             bleHandler.postDelayed(advertiseRunnable, NeighborDiscoveryConstants.ADVERTISE_INTERVAL_MS)
@@ -357,7 +373,13 @@ class MainViewModel @Inject constructor(
             Log.d(TAG, "기존 일반 광고 핸들러(advertiseRunnable) 제거됨.")
 
             Log.d(TAG, "NeighborAdvertiser.startAdvertising 호출 (Emergency=1)")
-            NeighborAdvertiser.startAdvertising(myServerUserId, myPreparedNicknameForAdv, myCurrentAdvertisedDepth, isEmergency = 1.toByte())
+            NeighborAdvertiser.startAdvertising(
+                myServerUserId, 
+                myPreparedNicknameForAdv, 
+                myCurrentAdvertisedDepth, 
+                isEmergency = 1.toByte(),
+                profileImageNumber = _uiState.value.userProfileImageNumber
+            )
 
             val emergencyDuration = 10000L // 10초 (또는 원하는 시간으로 조절)
             Log.d(TAG, "${emergencyDuration / 1000}초 동안 긴급 광고 유지 예정.")
@@ -415,6 +437,7 @@ class MainViewModel @Inject constructor(
                 SignalStrengthManager.clearHistoryForDevice(bleAddress)
                 return@forEach
             }
+            
             // 긴급 플래그 확인 및 처리
             if (scannedDevice.isEmergency == 1.toByte()) {
                 Log.i(TAG, "긴급 패킷 수신: Nick='${scannedDevice.nickname}', sID=${scannedDevice.serverUserId}, RSSI=${scannedDevice.rssi}")
@@ -473,11 +496,6 @@ class MainViewModel @Inject constructor(
                     }
                 }
 
-
-
-
-
-
             // 계산된 시각적 홉수 = 상대방 광고 홉수 + 1
             val calculatedVisualDepth = scannedDevice.advertisedOwnDepth + 1
             val advertisedDeviceDepth = scannedDevice.advertisedOwnDepth
@@ -503,20 +521,65 @@ class MainViewModel @Inject constructor(
             }
 
             val serverUserIdStr = scannedDevice.serverUserId.toString()
-            val newPerson = NearbyPerson(
-                serverUserIdString = serverUserIdStr,
-                nickname = scannedDevice.nickname.ifBlank { "익명_${serverUserIdStr.takeLast(4)}" },
-                calculatedVisualDepth = calculatedVisualDepth,
-                advertisedDeviceDepth = advertisedDeviceDepth,
-                rssi = smoothedRssi,
-                signalLevel = signalLevel,
-                angle = (abs(scannedDevice.serverUserId.hashCode()) % 360).toFloat(),
-                lastSeenTimestamp = scannedDevice.lastSeen
-            )
-            updatedNearbyMap[serverUserIdStr] = newPerson
             
-            // 각 디바이스 정보 로그 추가
-//            Log.d(TAG, "주변 기기 정보: 닉네임=${newPerson.nickname}, 시각적 Depth=${calculatedVisualDepth}, 신호=${signalLevel}, RSSI=${smoothedRssi}")
+            // 프로필 이미지 결정: 프로필 이미지 값이 0보다 크면 해당 값을 사용
+            val profileImageNumber = if (scannedDevice.serverUserId == myServerUserId) {
+                _uiState.value.userProfileImageNumber // 내 프로필이면 저장된 이미지 번호 사용
+            } else if (scannedDevice.profileImageNumber > 0) {
+                scannedDevice.profileImageNumber // BLE에서 받은 프로필 이미지 번호 사용
+            } else {
+                0 // 프로필 이미지 번호가 없으면 0으로 설정 (UI에서 서버ID 기반 랜덤 결정)
+            }
+            
+            // 마지막 UI 업데이트 시간 확인 
+            val lastUIUpdate = lastUIUpdatedTimestamps[serverUserIdStr] ?: 0L
+            val isNewDevice = lastUIUpdate == 0L
+            
+            // 새 디바이스, 업데이트 간격이 지났거나, 긴급 상태일 때만 전체 정보 업데이트
+            if (isNewDevice || 
+                currentTime - lastUIUpdate >= UI_UPDATE_INTERVAL_SHORT_MS || 
+                scannedDevice.isEmergency == 1.toByte()) {
+                
+                // UI 업데이트 시간 갱신
+                lastUIUpdatedTimestamps[serverUserIdStr] = currentTime
+                
+                // 각도는 처음 생성 시에만 랜덤하게 생성하고, 이후에는 유지
+                val angle = if (updatedNearbyMap.containsKey(serverUserIdStr)) {
+                    updatedNearbyMap[serverUserIdStr]!!.angle // 기존 각도 유지
+                } else if (!isNewDevice && _uiState.value.nearbyPeople.any { it.serverUserIdString == serverUserIdStr }) {
+                    // 업데이트 맵에는 없지만 UI 상태에 있는 경우 (기존 디바이스)
+                    _uiState.value.nearbyPeople.find { it.serverUserIdString == serverUserIdStr }!!.angle
+                } else {
+                    // 완전히 새로운 디바이스면 새 각도 생성
+                    (abs(scannedDevice.serverUserId.hashCode()) % 360).toFloat()
+                }
+                
+                // 업데이트된 정보로 NearbyPerson 객체 생성
+                val newPerson = NearbyPerson(
+                    serverUserIdString = serverUserIdStr,
+                    nickname = scannedDevice.nickname.ifBlank { "익명_${serverUserIdStr.takeLast(4)}" },
+                    calculatedVisualDepth = calculatedVisualDepth,
+                    advertisedDeviceDepth = advertisedDeviceDepth,
+                    rssi = smoothedRssi,
+                    signalLevel = signalLevel,
+                    angle = angle,
+                    lastSeenTimestamp = scannedDevice.lastSeen,
+                    profileImageNumber = profileImageNumber
+                )
+                updatedNearbyMap[serverUserIdStr] = newPerson
+            } else {
+                // 업데이트 간격이 지나지 않은 경우, 기존 정보를 유지하되 RSSI, signalLevel, lastSeen만 업데이트
+                val existingPerson = _uiState.value.nearbyPeople.find { it.serverUserIdString == serverUserIdStr }
+                if (existingPerson != null) {
+                    updatedNearbyMap[serverUserIdStr] = existingPerson.copy(
+                        rssi = smoothedRssi,
+                        signalLevel = signalLevel,
+                        lastSeenTimestamp = scannedDevice.lastSeen,
+                        // 프로필 이미지도 최신 정보로 항상 업데이트
+                        profileImageNumber = profileImageNumber
+                    )
+                }
+            }
         }
 
         // 앵커 기기를 발견했거나 최단 경로가 현재 내 홉수보다 짧을 때만 홉수 업데이트
@@ -536,19 +599,22 @@ class MainViewModel @Inject constructor(
             startOrUpdateAdvertising()
         }
 
+        // 오래된 디바이스 제거 (UI 목록에서)
+        lastUIUpdatedTimestamps.entries.removeIf { (id, timestamp) ->
+            val shouldRemove = currentTime - timestamp > NeighborDiscoveryConstants.DEVICE_EXPIRATION_MS
+            if (shouldRemove) {
+                Log.d(TAG, "오래된 디바이스 UI 정보 제거: ID=$id, 마지막 업데이트: ${(currentTime - timestamp) / 1000}초 전")
+            }
+            shouldRemove
+        }
+
         val newNearbyList = updatedNearbyMap.values.toList().sortedWith(
             compareBy<NearbyPerson> { it.calculatedVisualDepth }
                 .thenByDescending { it.signalLevel }
                 .thenByDescending { it.rssi }
         )
         
-        // 디버그 로그 추가
-//        Log.d(TAG, "주변 기기 수: ${newNearbyList.size}, UI 표시 여부: ${_uiState.value.nearbyPeople != newNearbyList}")
-        if (newNearbyList.isNotEmpty()) {
-//            Log.d(TAG, "첫 번째 기기: 닉네임=${newNearbyList[0].nickname}, 홉수=${newNearbyList[0].calculatedVisualDepth}, RSSI=${newNearbyList[0].rssi}")
-        }
-
-        // 항상 업데이트하도록 변경하여 UI 반영 문제 해결 (동등성 검사 제거)
+        // 항상 업데이트하도록 변경하여 UI 반영 문제 해결
         _uiState.update { it.copy(
             nearbyPeople = newNearbyList,
             showListButton = newNearbyList.isNotEmpty()
@@ -576,16 +642,33 @@ class MainViewModel @Inject constructor(
     fun onPersonClick(serverUserIdString: String) {
         val person = _uiState.value.nearbyPeople.find { it.serverUserIdString == serverUserIdString }
         if (person != null) {
-            // 네비게이션을 위한 상태 업데이트
-            _uiState.update {
-                it.copy(
-                    navigateToProfileServerUserIdString = serverUserIdString
-                )
-            }
-        } else {
-            Log.w(TAG, "클릭된 사용자 ID($serverUserIdString)를 현재 목록에서 찾을 수 없습니다.")
+            // 프로필 모달을 표시하도록 상태 업데이트
+            _uiState.update { it.copy(
+                showProfileModal = true,
+                selectedProfilePerson = person
+            )}
         }
     }
+
+    fun onProfileModalDismiss() {
+        _uiState.update { it.copy(
+            showProfileModal = false,
+            selectedProfilePerson = null
+        )}
+    }
+
+    fun onCallFromProfileModal() {
+        val serverUserIdString = _uiState.value.selectedProfilePerson?.serverUserIdString
+        if (serverUserIdString != null) {
+            // 프로필 모달 닫기
+            _uiState.update { it.copy(
+                showProfileModal = false,
+                selectedProfilePerson = null,
+                navigateToProfileServerUserIdString = serverUserIdString
+            )}
+        }
+    }
+
     fun onProfileScreenNavigated() = _uiState.update { it.copy(navigateToProfileServerUserIdString = null) }
     fun setDisplayDepthLevel(level: Int) {
         _uiState.update { it.copy(displayDepthLevel = level.coerceIn(1, NeighborDiscoveryConstants.DISPLAY_DEPTH_LEVELS.lastOrNull() ?: NeighborDiscoveryConstants.MAX_TRACKABLE_DEPTH)) }

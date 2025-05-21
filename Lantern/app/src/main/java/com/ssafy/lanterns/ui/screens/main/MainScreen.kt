@@ -70,6 +70,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import com.ssafy.lanterns.ui.screens.main.components.RescueAlertNotification
+import com.ssafy.lanterns.ui.screens.main.components.NearbyPersonListModal
+import com.ssafy.lanterns.ui.screens.main.components.ProfileModal
 
 /**
  * 메인 화면
@@ -341,15 +343,10 @@ fun MainScreen(
         ) {
             // 메인 컨텐츠 (하위 컴포넌트로 추출)
             MainContent(
-                isScanning = uiState.isScanningActive,
                 nearbyPeopleToDisplay = uiState.nearbyPeople.also { 
                    // Log.d("MainScreen", "전체 주변 사람 수: ${it.size}, 필터 적용될 수준: ${uiState.displayDepthLevel}, 표시될 것으로 예상: ${it.filter { p -> p.calculatedVisualDepth <= uiState.displayDepthLevel }.size}")
                 }.filter { it.calculatedVisualDepth <= uiState.displayDepthLevel.coerceAtLeast(3) },
-                currentSelfDepth = uiState.currentSelfAdvertisedDepth,
-                displayDepthLevel = uiState.displayDepthLevel.coerceAtLeast(3),
-                onDisplayDepthChange = viewModel::setDisplayDepthLevel,
                 showPersonListModal = uiState.showPersonListModal,
-                onShowListToggle = viewModel::togglePersonListModal,
                 onDismissModal = { viewModel.togglePersonListModal() },
                 onPersonClick = viewModel::onPersonClick,
                 onCallClick = { serverUserIdString ->
@@ -363,15 +360,11 @@ fun MainScreen(
                 ),
                 animationValues = AnimationValues(
                     buttonScale = buttonScale,
-                    buttonGlowAlpha = buttonGlowAlpha,
                     radarAngle = radarAngle,
                     dotPulseScale = dotPulseScale,
                     dotGlowAlpha = dotGlowAlpha
                 ),
-                buttonText = uiState.buttonText,
-                subTextVisible = uiState.subTextVisible,
-                showListButton = uiState.showListButton,
-                onCheckBluetoothState = { onScanButtonClick() }
+                userProfileImageNumber = uiState.userProfileImageNumber
             )
             AnimatedVisibility(
                 visible = uiState.rescueRequestReceived,
@@ -389,6 +382,19 @@ fun MainScreen(
                 )
             }
             
+            // 프로필 모달 표시
+            if (uiState.showProfileModal && uiState.selectedProfilePerson != null) {
+                val selectedPerson = uiState.selectedProfilePerson!! // non-null 단언 연산자 사용
+                ProfileModal(
+                    person = selectedPerson,
+                    onDismiss = { viewModel.onProfileModalDismiss() },
+                    onCallClick = { 
+                        navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", selectedPerson.serverUserIdString)}")
+                        viewModel.onProfileModalDismiss()
+                    },
+                    onChatClick = { viewModel.onCallFromProfileModal() }
+                )
+            }
         }
     }
 }
