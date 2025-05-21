@@ -69,6 +69,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import com.ssafy.lanterns.ui.screens.call.CallViewModel
 import com.ssafy.lanterns.ui.screens.main.components.RescueAlertNotification
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPersonListModal
 import com.ssafy.lanterns.ui.screens.main.components.ProfileModal
@@ -88,6 +89,7 @@ fun MainScreen(
     modifier: Modifier = Modifier,
     paddingValues: PaddingValues = PaddingValues(0.dp),
     viewModel: MainViewModel = hiltViewModel(),
+    callViewModel: CallViewModel = hiltViewModel(),
     onDeviceAIViewModel: OnDeviceAIViewModel = hiltViewModel()
 ) {
     // ViewModel로부터 UI 상태 수집
@@ -350,8 +352,8 @@ fun MainScreen(
                 onDismissModal = { viewModel.togglePersonListModal() },
                 onPersonClick = viewModel::onPersonClick,
                 onCallClick = { serverUserIdString ->
-                    navController.navigate("${AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", serverUserIdString)}")
-                    viewModel.togglePersonListModal() // 모달 닫기
+                    // 사용자 선택 시 통화 발신 화면으로 이동
+                    viewModel.onCallClick(serverUserIdString, navController, callViewModel)
                 },
                 rippleStates = Triple(
                     RippleState(rippleVisible.value, rippleAnimatable1.value),

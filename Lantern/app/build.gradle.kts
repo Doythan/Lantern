@@ -193,4 +193,6 @@ dependencies {
 
     // Porcupine
     implementation("ai.picovoice:porcupine-android:3.0.1")
+
+    implementation ("io.github.jaredmdobson:concentus:1.0.2")
 }

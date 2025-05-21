@@ -1,14 +1,22 @@
 package com.ssafy.lanterns.ui.navigation
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ssafy.lanterns.ui.common.MainScaffold
+import com.ssafy.lanterns.ui.screens.call.CallHistoryScreen
+import com.ssafy.lanterns.ui.screens.call.CallState
+import com.ssafy.lanterns.ui.screens.call.CallViewModel
 import com.ssafy.lanterns.ui.screens.call.IncomingCallScreen
 import com.ssafy.lanterns.ui.screens.call.OngoingCallScreen
 import com.ssafy.lanterns.ui.screens.call.OutgoingCallScreen
@@ -23,7 +31,8 @@ import com.ssafy.lanterns.ui.screens.mypage.MyPageScreen
 import com.ssafy.lanterns.ui.screens.ondevice.OnDeviceAIScreen
 import com.ssafy.lanterns.ui.screens.splash.SplashScreen
 import androidx.compose.ui.Modifier
-import com.ssafy.lanterns.ui.screens.call.CallHistoryScreen
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 
 // 네비게이션 라우트 정의
 object AppDestinations {
@@ -48,7 +57,7 @@ object AppDestinations {
     const val PROFILE_ARG_NAME = "name"
     const val PROFILE_ARG_DISTANCE = "distance"
 
-    const val CALL_HISTORY_ROUTE = "call_history"   
+    const val CALL_HISTORY_ROUTE = "call_history"
 }
 
 /**
@@ -58,6 +67,27 @@ object AppDestinations {
 fun AppNavigation(modifier: Modifier = Modifier) {
     // NavController 생성
     val navController = rememberNavController()
+
+    // CallViewModel 인스턴스 생성
+    val callViewModel: CallViewModel = hiltViewModel()
+
+    // 통화 상태를 관찰하여 수신 화면으로 자동 전환
+    val callUiState by callViewModel.uiState.collectAsState()
+    LaunchedEffect(callUiState.callState) {
+        if (callUiState.callState == CallState.INCOMING_CALL) {
+            // 이미 수신화면이 아닐 경우에만 네비게이션
+            if (navController.currentDestination?.route != AppDestinations.INCOMING_CALL_ROUTE) {
+                navController.navigate(AppDestinations.INCOMING_CALL_ROUTE) {
+                    // 중요: 어디서든지 수신화면으로 바로 이동할 수 있도록 설정
+                    popUpTo(navController.graph.startDestinationId) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+    }
 
     // NavHost 설정 - 시작 화면을 스플래시 화면으로 변경
     NavHost(
@@ -80,7 +110,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                 }
             }
         }
-        
+
         // 로그인 스크린 라우트
         composable(route = AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
@@ -94,8 +124,13 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
         // 메인 화면
         composable(AppDestinations.MAIN_SCREEN_ROUTE) {
+            // Activity 의존성을 제거했으므로 initialize 호출 제거
             MainScaffold(navController = navController) { paddingValues ->
-                MainScreen(paddingValues = paddingValues, navController = navController)
+                MainScreen(
+                    paddingValues = paddingValues,
+                    navController = navController,
+                    callViewModel = callViewModel
+                )
             }
         }
 
@@ -106,6 +141,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
                     navController = navController,
                     paddingValues = paddingValues,
                     onCallItemClick = { callerId ->
+                        // 통화 발신 화면으로 이동하면서 CallViewModel에 타겟 ID 전달
+                        callViewModel.requestCallToId(callerId.toString())
                         navController.navigate(AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", callerId.toString()))
                     }
                 )
@@ -132,30 +169,92 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
         // 전화 수신 화면
         composable(AppDestinations.INCOMING_CALL_ROUTE) {
-             IncomingCallScreen(
-                 callerName = "임시 발신자",
-                 onRejectClick = { navController.popBackStack() },
-                 onAcceptClick = {
-                     navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) {
-                         popUpTo(AppDestinations.INCOMING_CALL_ROUTE) { inclusive = true }
-                     }
-                 }
-             )
+            val uiState by callViewModel.uiState.collectAsState()
+
+            // 상태에 따른 화면 전환
+            LaunchedEffect(uiState.callState) {
+                when (uiState.callState) {
+                    CallState.ONGOING_CALL -> {
+                        navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) {
+                            popUpTo(AppDestinations.INCOMING_CALL_ROUTE) { inclusive = true }
+                        }
+                    }
+                    CallState.DISCONNECTED -> {
+                        callViewModel.resetCallState()
+                        navController.popBackStack()
+                    }
+                    CallState.IDLE -> {
+                        navController.popBackStack()
+                    }
+                    else -> {}
+                }
+            }
+
+            IncomingCallScreen(
+                callerName = uiState.targetPerson?.nickname ?: "알 수 없는 발신자",
+                callerId = 1,
+                onRejectClick = { callViewModel.endCall() },
+                onAcceptClick = { callViewModel.acceptCall() }
+            )
         }
 
-        // 통화 거는 중 화면
+        // 통화 거는 중 화면 - 수정된 부분
         composable(
             route = AppDestinations.OUTGOING_CALL_ROUTE,
             arguments = listOf(navArgument(AppDestinations.OUTGOING_CALL_ARG_RECEIVER_ID) { type = NavType.StringType })
         ) { backStackEntry ->
             val receiverId = backStackEntry.arguments?.getString(AppDestinations.OUTGOING_CALL_ARG_RECEIVER_ID)
-            if (receiverId != null) {
-                OutgoingCallScreen(
-                    receiverName = "수신자",
-                    receiverId = receiverId.toIntOrNull() ?: 1,
-                    onCancelClick = {
+            val uiState by callViewModel.uiState.collectAsState()
+
+            // 상태 로깅
+            DisposableEffect(Unit) {
+                Log.d("AppNavigation", "OutgoingCallScreen 컴포저블 들어옴 - 현재 callState: ${uiState.callState}")
+                onDispose {
+                    Log.d("AppNavigation", "OutgoingCallScreen 컴포저블 나감")
+                }
+            }
+
+            // 상태 변경을 감지하는 LaunchedEffect - 핵심 변경 부분
+            LaunchedEffect(uiState.callState) {
+                Log.d("AppNavigation", "OutgoingCallScreen - callState 변경 감지: ${uiState.callState}")
+
+                when (uiState.callState) {
+                    CallState.ONGOING_CALL -> {
+                        Log.d("AppNavigation", "ONGOING_CALL 상태 전환 시작")
+                        try {
+                            navController.navigate(AppDestinations.ONGOING_CALL_ROUTE) {
+                                popUpTo(AppDestinations.OUTGOING_CALL_ROUTE) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                            Log.d("AppNavigation", "ONGOING_CALL 상태 전환 완료")
+                        } catch (e: Exception) {
+                            Log.e("AppNavigation", "화면 전환 오류: ${e.message}", e)
+                        }
+                    }
+                    CallState.DISCONNECTED -> {
+                        Log.d("AppNavigation", "DISCONNECTED 상태 감지됨, 뒤로가기")
+                        callViewModel.resetCallState()
                         navController.popBackStack()
                     }
+                    else -> {
+                        Log.d("AppNavigation", "다른 상태 감지됨: ${uiState.callState}")
+                    }
+                }
+            }
+
+            // 발신자 ID 설정 및 화면 표시
+            LaunchedEffect(receiverId) {
+                if (uiState.callState == CallState.IDLE && receiverId != null) {
+                    callViewModel.requestCallToId(receiverId)
+                }
+            }
+
+            if (receiverId != null) {
+                OutgoingCallScreen(
+                    receiverName = uiState.targetPerson?.nickname ?: "알 수 없는 사용자",
+                    receiverId = receiverId.toIntOrNull() ?: 1,
+                    onCancelClick = { callViewModel.endCall() },
+                    callViewModel = callViewModel  // callViewModel 전달
                 )
             } else {
                 Text("Error: Receiver ID not found.")
@@ -163,15 +262,42 @@ fun AppNavigation(modifier: Modifier = Modifier) {
         }
 
         // 통화 중 화면
+        // 통화 중 화면
         composable(AppDestinations.ONGOING_CALL_ROUTE) {
+            val uiState by callViewModel.uiState.collectAsState()
+
+            // 중요: 화면이 나갈 때 연결이 끊어지지 않도록 함
+            DisposableEffect(Unit) {
+                Log.d("AppNavigation", "OngoingCallScreen 컴포저블 들어옴 - 리스너/연결 유지 모드")
+                callViewModel.onScreenActive()
+                onDispose {
+                    Log.d("AppNavigation", "OngoingCallScreen 컴포저블 나감 - 연결 유지")
+                    // 여기서 endCall이나 다른 해제 코드를 호출하지 않음
+                }
+            }
+
+            // 기존 LaunchedEffect는 유지
+            LaunchedEffect(uiState.callState) {
+                if (uiState.callState == CallState.DISCONNECTED || uiState.callState == CallState.IDLE) {
+                    Log.d("AppNavigation", "통화 종료 상태 감지, 메인 화면으로 이동")
+                    callViewModel.resetCallState()
+                    navController.popBackStack(AppDestinations.MAIN_SCREEN_ROUTE, false)
+                }
+            }
+
+            LaunchedEffect(Unit) {
+                Log.d("AppNavigation", "OngoingCallScreen 시작 - 상태 유지")
+                if (uiState.callState == CallState.ONGOING_CALL && uiState.callDuration == 0) {
+                    callViewModel.startCallDurationTimer()
+                }
+            }
+
             OngoingCallScreen(
-                 callerName = "임시 발신자",
-                 onEndCallClick = {
-                     navController.navigate(AppDestinations.MAIN_SCREEN_ROUTE){
-                         popUpTo(AppDestinations.LOGIN_ROUTE)
-                     }
-                 }
-             )
+                callerName = uiState.targetPerson?.nickname ?: "알 수 없는 사용자",
+                callerId = 1,
+                onEndCallClick = { callViewModel.endCall() },
+                callViewModel = callViewModel
+            )
         }
 
         // 채팅 화면
@@ -199,8 +325,8 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             val userId = backStackEntry.arguments?.getString(AppDestinations.DIRECT_CHAT_ARG_USER_ID)
             if (userId != null) {
                 DirectChatScreen(
-                     userId = userId,
-                     navController = navController
+                    userId = userId,
+                    navController = navController
                 )
             } else {
                 Text("Error: User ID not found.")
@@ -219,7 +345,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             val userId = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_USER_ID) ?: ""
             val name = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_NAME) ?: ""
             val distance = backStackEntry.arguments?.getString(AppDestinations.PROFILE_ARG_DISTANCE) ?: ""
-            
+
             ProfileScreen(
                 navController = navController,
                 userData = UserProfileData(

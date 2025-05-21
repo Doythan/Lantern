@@ -14,6 +14,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavController
 import com.ssafy.lanterns.config.BleConstants
 import com.ssafy.lanterns.config.NeighborDiscoveryConstants
 import com.ssafy.lanterns.data.model.User
@@ -21,6 +22,7 @@ import com.ssafy.lanterns.data.repository.UserRepository
 import com.ssafy.lanterns.di.EmergencyEventTrigger
 import com.ssafy.lanterns.service.ble.advertiser.NeighborAdvertiser
 import com.ssafy.lanterns.service.ble.scanner.NeighborScanner
+import com.ssafy.lanterns.ui.screens.call.CallViewModel
 import com.ssafy.lanterns.ui.screens.main.components.NearbyPerson
 import com.ssafy.lanterns.utils.SignalStrengthManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -314,11 +316,27 @@ class MainViewModel @Inject constructor(
     }
 
     fun onScreenPaused() {
+        Log.d(TAG, "화면 일시정지: 통화 상태 확인")
+
+        // CallViewModel 통화 상태 확인 (static 메서드 사용)
+        val isCallActive = try {
+            // 통화 활성 상태 확인
+            com.ssafy.lanterns.ui.screens.call.CallViewModel.isCallActive()
+        } catch (e: Exception) {
+            Log.e(TAG, "통화 상태 확인 실패", e)
+            false
+        }
+
+        if(isCallActive) {
+            Log.d(TAG, "통화가 활성 상태이므로 BLE 작업 중지하지 않음")
+            return
+        }
+
+        // 화면 일시정지 처리 (통화 중이 아닐 때만)
         Log.d(TAG, "화면 일시정지: BLE 작업 중지")
-        // 스캔 중지하되 isScanningActive 상태는 유지하지 않음 (다시 켤 때 사용자가 명시적으로 켜도록)
         if(_uiState.value.isScanningActive){
             stopBleOperationsInternal()
-             _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작") }
+            _uiState.update { it.copy(isScanningActive = false, buttonText = "탐색 시작") }
         }
     }
 
@@ -637,6 +655,22 @@ class MainViewModel @Inject constructor(
 
     fun togglePersonListModal() {
         _uiState.update { it.copy(showPersonListModal = !it.showPersonListModal) }
+    }
+
+    fun onCallClick(serverUserIdString: String, navController: NavController, callViewModel: CallViewModel) {
+        val person = _uiState.value.nearbyPeople.find { it.serverUserIdString == serverUserIdString }
+        if (person != null) {
+            // 목록 모달 닫기
+            togglePersonListModal()
+
+            // 통화 화면으로 이동 전에 타겟 설정
+            callViewModel.setTargetPerson(person)
+
+            // 아웃고잉 화면으로 이동
+            navController.navigate(AppDestinations.OUTGOING_CALL_ROUTE.replace("{receiverId}", serverUserIdString))
+        } else {
+            Log.w(TAG, "클릭된 사용자 ID($serverUserIdString)를 현재 목록에서 찾을 수 없습니다.")
+        }
     }
 
     fun onPersonClick(serverUserIdString: String) {
