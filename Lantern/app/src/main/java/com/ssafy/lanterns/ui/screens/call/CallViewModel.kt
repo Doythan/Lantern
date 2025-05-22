@@ -820,7 +820,7 @@ class CallViewModel @Inject constructor(
                             } catch (e: Exception) {
                                 Log.e(TAG, "오디오 인코딩/전송 오류: ${e.message}", e)
                             }
-                            Thread.sleep(1)
+                            Thread.sleep(18)
                         }
                     }
                 } catch (e: Exception) {
