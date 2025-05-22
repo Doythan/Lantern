@@ -216,10 +216,10 @@ object NeighborScanner {
                                 return@let
                             }
                             
-                            // RSSI 값 필터링 (-98 이하는 무시)
-                            if (scanResult.rssi < -98) {
-                                return@let
-                            }
+                            // // RSSI 값 필터링 (-98 이하는 무시)
+                            // if (scanResult.rssi < -98) {
+                            //     return@let
+                            // }
                             
                             if (parsed.nickname == "ErrorParse") {
                                 // ErrorParse 기기는 맵에 추가하지 않음
