@@ -251,7 +251,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
 
             if (receiverId != null) {
                 OutgoingCallScreen(
-                    receiverName = uiState.targetPerson?.nickname ?: "알 수 없는 사용자",
+                    receiverName = uiState.targetPerson?.nickname ?: "사용자",
                     receiverId = receiverId.toIntOrNull() ?: 1,
                     onCancelClick = { callViewModel.endCall() },
                     callViewModel = callViewModel  // callViewModel 전달
@@ -293,7 +293,7 @@ fun AppNavigation(modifier: Modifier = Modifier) {
             }
 
             OngoingCallScreen(
-                callerName = uiState.targetPerson?.nickname ?: "알 수 없는 사용자",
+                callerName = uiState.targetPerson?.nickname ?: "사용자",
                 callerId = 1,
                 onEndCallClick = { callViewModel.endCall() },
                 callViewModel = callViewModel

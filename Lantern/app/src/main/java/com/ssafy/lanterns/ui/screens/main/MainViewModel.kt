@@ -422,7 +422,7 @@ class MainViewModel @Inject constructor(
     }
 
     private val lastEmergencyNotificationTimestamps = mutableMapOf<String, Long>()
-    private val EMERGENCY_NOTIFICATION_COOLDOWN_MS = 10 * 60 * 1000L
+    private val EMERGENCY_NOTIFICATION_COOLDOWN_MS = 30 * 60 * 1000L
     private val EMERGENCY_ALERT_AUTO_DISMISS_MS = 5 * 1000L // 긴급 UI 알림 자동 해제 시간 (15초)
     private val EMERGENCY_RSSI_THRESHOLD = -80
 

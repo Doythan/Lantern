@@ -155,15 +155,15 @@ fun ChatMessageBubble(
                         style = MaterialTheme.typography.bodyLarge 
                     )
                     
-                    if (isRelayed) {
-                        Spacer(modifier = Modifier.height(1.dp))
-                        Text(
-                            text = "릴레이됨",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = metaTextColor.copy(alpha = 0.8f),
-                            modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
-                        )
-                    }
+                    // if (isRelayed) {
+                    //     Spacer(modifier = Modifier.height(1.dp))
+                    //     Text(
+                    //         text = "릴레이됨",
+                    //         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    //         color = metaTextColor.copy(alpha = 0.8f),
+                    //         modifier = Modifier.align(if (isMe) Alignment.Start else Alignment.End)
+                    //     )
+                    // }
                     
                     Spacer(modifier = Modifier.height(2.dp))
                     
