@@ -1,0 +1,134 @@
+package com.ssafy.lanterns.di // 실제 패키지 경로에 맞게 수정
+
+import android.content.Context
+// import androidx.credentials.CredentialManager // 제거되었으므로 주석 처리 또는 삭제
+import androidx.room.Room
+import com.ssafy.lanterns.data.database.AppDatabase
+import com.ssafy.lanterns.data.repository.*
+// import com.ssafy.lantern.data.source.ble.scanner.ScannerManager // 제거
+// Hilt import 추가
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+// Module을 추상 클래스로 변경하고 Binds 사용 권장
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class DataModule { // object -> abstract class
+
+    // UserDao, UserRepository 등 기존 @Provides 함수들은 companion object로 이동
+    companion object {
+        @Provides
+        @Singleton
+        fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+            return Room.databaseBuilder(
+                context,
+                AppDatabase::class.java,
+                "lantern.db"
+            )
+                .fallbackToDestructiveMigration() // 주의: 마이그레이션 전략 필요시 수정
+                .build()
+        }
+
+        @Provides
+        @Singleton
+        fun provideUserDao(appDatabase: AppDatabase): UserDao {
+            return appDatabase.userDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideChatRoomDao(appDatabase: AppDatabase): ChatRoomDao {
+            return appDatabase.chatRoomDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideMessagesDao(appDatabase: AppDatabase): MessagesDao {
+            return appDatabase.messagesDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideFollowDao(appDatabase: AppDatabase): FollowDao {
+            return appDatabase.followDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideCallListDao(appDatabase: AppDatabase): CallListDao {
+            return appDatabase.callListDao()
+        }
+        
+        @Provides
+        @Singleton
+        fun provideCallHistoryDao(appDatabase: AppDatabase): CallHistoryDao {
+            return appDatabase.callHistoryDao()
+        }
+
+        // UserRepository 제공 메서드 추가
+        @Provides
+        @Singleton
+        fun provideUserRepositoryImpl(
+            userDao: UserDao,
+            chatRoomDao: ChatRoomDao,
+            messagesDao: MessagesDao,
+            followDao: FollowDao,
+            callListDao: CallListDao,
+            @ApplicationContext context: Context
+        ): UserRepositoryImpl {
+            return UserRepositoryImpl(userDao, chatRoomDao, messagesDao, followDao, callListDao, context)
+        }
+        
+        @Provides
+        @Singleton
+        fun provideCallHistoryRepositoryImpl(
+            callHistoryDao: CallHistoryDao
+        ): CallHistoryRepositoryImpl {
+            return CallHistoryRepositoryImpl(callHistoryDao)
+        }
+    }
+
+    // AuthRepository 바인딩 (Binds 사용)
+    // 구글 로그인 구현체 (현재는 사용하지 않음)
+    // @Binds
+    // @Singleton
+    // abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    // JWT 인증 구현체
+    @Binds
+    @Singleton
+    abstract fun bindAuthRepository(impl: AuthRepositoryGoogleImpl): AuthRepository
+
+    // UserRepository 바인딩 (Binds 사용)
+    @Binds
+    @Singleton
+    abstract fun bindUserRepository(impl: UserRepositoryImpl): UserRepository
+    
+    // CallHistoryRepository 바인딩 (Binds 사용)
+    @Binds
+    @Singleton
+    abstract fun bindCallHistoryRepository(impl: CallHistoryRepositoryImpl): CallHistoryRepository
+
+    // CredentialManager 관련 코드 없음
+
+    // --- 리팩토링된 BLE 매니저 Provider --- //
+
+    // ScannerManager는 ScanCallback을 ViewModel에서 동적으로 생성/전달해야 하므로
+    // Hilt Singleton 주입에는 적합하지 않음. ViewModel에서 직접 생성하여 사용.
+    /*
+    @Provides
+    @Singleton // 또는 다른 범위
+    fun provideScannerManager(@ApplicationContext context: Context): ScannerManager {
+       // 콜백 문제로 주입 대신 ViewModel에서 직접 생성
+       // return ScannerManager(context, { _ -> })
+    }
+    */
+
+    // PermissionHelper는 Activity가 필요하므로 ViewModel 주입 부적합.
+    // Composable에서 직접 처리 (Accompanist 사용)
+}
