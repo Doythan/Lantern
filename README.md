@@ -47,19 +47,23 @@
 ### 시연 영상(YouTube)
 <!-- [![쏙쏙](img/ssockssock.png)](https://youtu.be/3BXyRPZQ93U) -->
 ### 
- - 사용자의동작을 실시간으로 인식하여 스토리 진행
- - ex) 조약돌 줍기 -> 조약돌 줍는 모션으로 스토리 진행
 
- ![alt text](img/stone.gif)
-### 🎊 이벤트 트리거 
- - 특정 모션을 취했을 때 이벤트 발생
- - ex) 쿠키 미션에서 카메라에 입을 벌렸다 오므리면 쿠키 먹는 이벤트 발생
+### 📡 BLE Mesh 기반 통신
+ - 스마트폰 간 Bluetooth Low Energy 통신을 활용하여 자율적으로 Mesh 네트워크 구성
+ - 인터넷이나 Wi-Fi 없이도 통신 가능
+ - 중간 노드를 통한 다중 홉(hop) 메시지 및 음성 데이터 릴레이
 
-![alt text](img/cookie.gif)
-### 🔊 음성 인식 & 대화형 진행
-- 특정 대사를 직접 말하면서 동화가 진행 (아이들이 직접 주인공이 되어 대화 따라하기)
 
- ![alt text](img/readtext.gif)
+
+<img src="img/searchneighbor.gif" alt="BLE Mesh 네트워크 시연" style="width: 100%; max-width: 200px; height: auto;">
+
+### 💬 텍스트 메세지 송수신
+- 메세지 TTL을 설정하여 전송 거리 및 횟수 제한
+- UUID 및 해시 기반 중복 메시지 필터링을 통한 불필요한 재전송 방지
+- 패킷 유실 최소화를 위한 큐 기반의 순차 처리 및 재전송 전략
+- 수신 즉시 메시지를 브로드캐스트하여 실시간 네트워크 전파
+
+<img src="img/.gif" alt="BLE Mesh 네트워크 시연" style="width: 100%; max-width: 200px; height: auto;">
 ### 🎮 게임 요소 진행 
 - webRTC와 socket을 사용하여 실시간으로 친구와 상호작용
 - 동화 진행 중 미션 수행 (ex 마녀와 가위바위보)
