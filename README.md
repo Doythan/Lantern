@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # SSAFY 12기 E204 Lantern - 랜턴
 
 
