@@ -64,13 +64,6 @@
 - 수신 즉시 메시지를 브로드캐스트하여 실시간 네트워크 전파
 
 <img src="img/.gif" alt="BLE Mesh 네트워크 시연" style="width: 100%; max-width: 200px; height: auto;">
-### 🎮 게임 요소 진행 
-- webRTC와 socket을 사용하여 실시간으로 친구와 상호작용
-- 동화 진행 중 미션 수행 (ex 마녀와 가위바위보)
-
- ![alt text](img/RSP.gif)
-### 📷 나만의 앨범 생성
-- 동화 진행 중 엄지 척 모션을 통한 화면 캡처로 사용자가 기억하고 싶은 순간을 저장
 
 ![alt text](img/capture.gif)
 
