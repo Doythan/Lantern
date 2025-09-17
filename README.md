@@ -1,6 +1,5 @@
 # SSAFY 12기 E204 Lantern - 랜턴
 
-
 ### 📡 통신이 끊겨도 걱정 마세요! 
 ### 🚶‍♀️ BLE Mesh로 사용자와 즉시 연결! 
 ### 🆘 재난 속 구조 요청부터 오프라인 소셜까지, 당신 곁엔 언제나 랜턴!
@@ -33,8 +32,6 @@
  - 스마트폰 간 Bluetooth Low Energy 통신을 활용하여 자율적으로 Mesh 네트워크 구성
  - 인터넷이나 Wi-Fi 없이도 통신 가능
  - 중간 노드를 통한 다중 홉(hop) 메시지 및 음성 데이터 릴레이
-
-
 
 <img src="img/searchneighbor.gif" alt="BLE Mesh 네트워크 시연" style="width: 100%; max-width: 200px; height: auto;">
 
