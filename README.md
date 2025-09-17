@@ -69,20 +69,81 @@
 
 <br>
 
-## ERD
-![랜턴 ERD](img/erd_mongle.png)
+## 🖥️ 기술 스택
 
-<br>
+### 📱 Front-End
+- Kotlin  
+- Jetpack Compose (UI)  
+- Android Bluetooth LE API  
+- BLE Mesh (자체 구현)  
+- Room / SQLite (로컬 DB)  
 
-## 기능명세서
-![기능명세1](img/img11.png)  
-![기능명세2](img/img22.png)  
-<br>
+### 🖥 Back-End
+- Java  
+- Spring Boot  
+- MySQL  
 
-## 기능명세서
-![alt text](img/img11.png)
-![alt text](img/img22.png)
+### 🎙 Voice Trigger
+- Porcupine (Wake Word Engine)  
 
-<br>
+### ☁ Infra
+- AWS EC2  
+- Docker  
+- Nginx  
+- Jenkins  
 
-## 기술스택
+### 🛠 Management & Collaboration
+- GitLab  
+- Notion  
+- Jira  
+- Mattermost  
+
+---
+
+## 🏗️ 아키텍처 & 데이터 경계
+
+**📌 한 줄 핵심:**  
+오프라인 통신(BLE·Mesh) 기반 안드로이드 앱 **랜턴(Lantern)** 과, 최소 백엔드(Be)가 인증/토큰을 담당하는 멀티 리포 구조.  
+앱 로컬 DB는 **Room**, 서버 DB는 **MySQL(RDB)** 로 `사용자/인증`에 집중.  
+메시지/통화 기록은 주로 단말(Room)에 저장, 서버는 사용자·토큰·소셜로그인 매핑이 핵심.  
+
+---
+
+### 🔹 1) 백엔드 (Be)
+- **Spring Boot + Security + OAuth2(Google) + JWT + MyBatis**  
+- Google 로그인 → 서버가 JWT 발급  
+- **DB 스키마:** `users`, 소셜 로그인 매핑, 토큰 관리  
+- 메시지/콜 데이터는 서버에 저장하지 않음 → **인증 게이트웨이 역할**  
+
+---
+
+### 🔹 2) 모바일 앱
+- **Kotlin + Jetpack Compose + Room**  
+- BLE 모듈: `Advertiser` / `Scanner` / `GATT`  
+- Mesh 레이어: `Transport` / `Security` / `Provisioning`  
+- 서비스: `BleService`, `MeshNetworkService`, `CallService`  
+- 로컬 영속화: `ChatRoom`, `Messages`, `CallHistory`, `User`, `Follow` 등 Room 엔티티  
+
+---
+
+### 🔹 3) 데이터 경계
+- **서버:** 사용자/토큰/소셜로그인 매핑 중심, 장기 메시지 저장 없음  
+- **클라이언트(Room):** 채팅/콜 로그/팔로우/메시지 전부 로컬에 저장 → **오프라인 퍼스트 UX**  
+
+---
+
+### 🔹 4) 아키텍처 플로우
+```mermaid
+flowchart TD
+    User[사용자] -- Google OAuth --> BE[Be 서버]
+    BE -- JWT 발급/검증 --> App[앱]
+
+    subgraph Mobile App
+        App -- Advertise/Scan/GATT --> Peer[주변 단말들]
+        App --> RoomDB[(Room DB)]
+        App -. JWT 포함 API 호출 .-> BE
+    end
+
+    Peer <-- Mesh Routing/Transport/Security --> App
+
+
