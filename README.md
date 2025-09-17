@@ -69,30 +69,14 @@
 
 <br>
 
-## 팀원 소개
-| 이름 | 역할 |
-|:--:|:--:|
-| 👑 **[이동규 (팀장)](https://github.com/Iwannabegosu)**| BE & INFRA|
-| 🌟 **[김한민](https://github.com/skdud5126)** | FE |
-| ✏️ **[천세윤](https://github.com/jhnam0324)** | BE |
-| 🐶 **[도경원](https://github.com/xongeeuse)** | FE |
-| 🚀 **[박수민](https://github.com/garam0107)** | BE |
-
-<br>
-
 ## ERD
-![alt text](img/erd_mongle.png)
+![랜턴 ERD](img/erd_mongle.png)
 
 <br>
 
-## API 명세서
-### - 동화 관련 API
-![alt text](img/fairytale_api.png)
-### - 유저 관련 API
-![alt text](img/user_api.png)
-### - 친구 관련 API
-![alt text](img/friend_api.png)
-
+## 기능명세서
+![기능명세1](img/img11.png)  
+![기능명세2](img/img22.png)  
 <br>
 
 ## 기능명세서
@@ -101,43 +85,4 @@
 
 <br>
 
-## 배포 링크
-
-https://j12e201.p.ssafy.io/
-
-<br>
-
-
 ## 기술스택
-
-```
-Front-End
-- React, TailwindCSS, Zustand, node.js, JavaScript
-
-Back-end 
-- Java
-- Spring Boot
-- Spring Web
-- Spring Security
-- Spring cloud gateway
-- Spring cloud netflix eureka
-- redis
-- mysql
-
-Infra
-- Ubuntu
-- Docker
-- Jenkins
-
-```
-
-
-<br>
-
-
-## 아키텍쳐 구조도
-
-![alt text](img/Architecture_mogle_fin.png)
-
----
-
