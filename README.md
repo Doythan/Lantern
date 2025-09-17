@@ -45,8 +45,6 @@
 
 ![alt text](img/capture.gif)
 
-<br>
-
 ## 🖥️ 기술 스택
 
 ### 📱 Front-End
